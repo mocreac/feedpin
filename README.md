@@ -2,21 +2,23 @@
 
 Annotate any live web page. Copy the markdown. Paste it into Claude Code, Codex, or whatever agent you use. It knows exactly what to fix.
 
-Feedpin is a Chrome extension that lets you pin comments on UI elements and export them as structured markdown — complete with CSS selectors, element types, and page context. No screenshots, no context loss.
+Feedpin is a Chrome extension that lets you pin comments on UI elements and export them as structured markdown with CSS selectors, element types, and page context.
 
 ## Install
+
+Chrome Web Store listing coming soon.
+
+**Manual install:**
 
 1. Clone this repo
 2. Open `chrome://extensions`
 3. Enable **Developer mode**
 4. Click **Load unpacked** and select the repo directory
 
-No build step. No dependencies. Just load and go.
-
 ## How it works
 
 1. Click the Feedpin icon to activate
-2. Hover over any element — it highlights and shows the element type
+2. Hover over any element to see it highlighted with its element type
 3. Click to pin a comment
 4. Hit **A** to copy all annotations as markdown
 5. Paste into your agent, ticket, or chat
@@ -44,12 +46,12 @@ The exported markdown includes the page URL, each element's CSS selector and typ
 ## Export format
 
 ```markdown
-# Design Review — Page Title
+# Design Review - Page Title
 **URL:** https://example.com/page
 
 ## 1
 **Element:** `nav.main-nav > ul > li:nth-of-type(3)` (list item)
-Spacing between nav items is inconsistent — should be 16px
+Spacing between nav items is inconsistent, should be 16px
 
 ---
 

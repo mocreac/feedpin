@@ -450,7 +450,7 @@
   /* ── copy ──────────────────────────────────────────────── */
   function formatMarkdown() {
     var lines = [
-      '# Design Review \u2014 ' + document.title,
+      '# Design Review - ' + document.title,
       '**URL:** ' + location.href, '',
     ];
     annotations.forEach(function (ann, i) {

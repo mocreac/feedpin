@@ -1,0 +1,406 @@
+/* ── variables & root ─────────────────────────────────── */
+#pinpoint-root {
+  --pp-accent: #d4620e;
+  --pp-accent-hover: #b8540c;
+  --pp-accent-glow: rgba(212, 98, 14, 0.25);
+  --pp-bg: #232323;
+  --pp-bg-light: #2e2e2e;
+  --pp-bg-raised: #292929;
+  --pp-text: #f0f0f0;
+  --pp-text-dim: #888;
+  --pp-border: #3a3a3a;
+  --pp-border-light: #444;
+  --pp-shadow: 0 6px 28px rgba(0, 0, 0, 0.55), 0 1px 3px rgba(0, 0, 0, 0.3);
+  --pp-inset: inset 0 1px 0 rgba(255,255,255,0.04), inset 0 -1px 0 rgba(0,0,0,0.2);
+
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  z-index: 2147483640;
+  pointer-events: none;
+}
+
+#pinpoint-root *,
+#pinpoint-root *::before,
+#pinpoint-root *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.4;
+  color: var(--pp-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── comment-mode cursor ─────────────────────────────── */
+html.pp-commenting,
+html.pp-commenting body,
+html.pp-commenting body * {
+  cursor: crosshair !important;
+}
+
+#pinpoint-root .pp-bar-btn,
+#pinpoint-root .pp-toggle,
+#pinpoint-root .pp-pin,
+#pinpoint-root .pp-pop-btn {
+  cursor: pointer !important;
+}
+
+#pinpoint-root .pp-pop-btn[disabled] {
+  cursor: default !important;
+}
+
+#pinpoint-root .pp-pop-input {
+  cursor: text !important;
+}
+
+/* ── hidden helper ───────────────────────────────────── */
+#pinpoint-root .pp-hidden {
+  display: none !important;
+}
+
+/* ── hover overlay ───────────────────────────────────── */
+#pinpoint-root .pp-overlay {
+  position: fixed;
+  border: 2px solid var(--pp-accent);
+  border-radius: 4px;
+  background: rgba(212, 98, 14, 0.045);
+  pointer-events: none;
+  z-index: 2147483641;
+  opacity: 0;
+  transition: opacity 100ms, top 60ms, left 60ms, width 60ms, height 60ms;
+}
+
+#pinpoint-root .pp-overlay.pp-on {
+  opacity: 1;
+}
+
+/* ── element-type tooltip ────────────────────────────── */
+#pinpoint-root .pp-tip {
+  position: fixed;
+  background: var(--pp-bg);
+  border: 1px solid var(--pp-border);
+  color: var(--pp-text-dim);
+  padding: 3px 9px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  white-space: nowrap;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  z-index: 2147483642;
+  opacity: 0;
+  transition: opacity 100ms;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+}
+
+#pinpoint-root .pp-tip.pp-on {
+  opacity: 1;
+}
+
+/* ── pin layer ───────────────────────────────────────── */
+#pinpoint-root .pp-pin-layer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2147483643;
+}
+
+/* ── individual pin (#7 — scaled for multi-digit) ────── */
+#pinpoint-root .pp-pin {
+  position: fixed;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #e07020 0%, var(--pp-accent) 100%);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  box-shadow:
+    0 2px 8px rgba(212, 98, 14, 0.35),
+    0 1px 2px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255,255,255,0.2);
+  transition: transform 150ms ease, box-shadow 150ms ease;
+  user-select: none;
+}
+
+#pinpoint-root .pp-pin:hover {
+  transform: scale(1.15);
+  box-shadow:
+    0 3px 12px rgba(212, 98, 14, 0.45),
+    0 1px 3px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255,255,255,0.2);
+}
+
+#pinpoint-root .pp-pin.pp-pin-sm {
+  font-size: 9px;
+  letter-spacing: -0.5px;
+}
+
+#pinpoint-root .pp-pin.pp-pin-xs {
+  width: 30px;
+  height: 30px;
+  font-size: 8px;
+  letter-spacing: -0.5px;
+}
+
+/* ── toolbar ─────────────────────────────────────────── */
+#pinpoint-root .pp-bar {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: linear-gradient(180deg, rgba(42, 42, 42, 0.92) 0%, rgba(34, 34, 34, 0.92) 100%);
+  border: 1px solid var(--pp-border);
+  border-radius: 9999px;
+  padding: 5px;
+  z-index: 2147483647;
+  box-shadow:
+    var(--pp-shadow),
+    inset 0 1px 0 rgba(255,255,255,0.05);
+  pointer-events: auto;
+  animation: pp-slide-up 200ms ease;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+@keyframes pp-slide-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+#pinpoint-root .pp-bar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--pp-text-dim);
+  transition: background 150ms, color 150ms, box-shadow 150ms,
+              filter 150ms, opacity 150ms;
+  pointer-events: auto;
+  flex-shrink: 0;
+  outline: none;
+}
+
+#pinpoint-root .pp-bar-btn:hover {
+  background: var(--pp-bg-light);
+  color: var(--pp-text);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+#pinpoint-root .pp-bar-btn.pp-active-btn {
+  background: linear-gradient(180deg, #e07020 0%, var(--pp-accent) 100%);
+  color: #fff;
+  box-shadow:
+    0 1px 4px rgba(212, 98, 14, 0.35),
+    inset 0 1px 0 rgba(255,255,255,0.15);
+}
+
+#pinpoint-root .pp-bar-btn.pp-btn-delete:hover {
+  background: #dc2626;
+  color: #fff;
+}
+
+/* ── undo button state (#4) ──────────────────────────── */
+#pinpoint-root .pp-bar-btn.pp-undo-btn {
+  color: #4ade80;
+}
+
+#pinpoint-root .pp-bar-btn.pp-undo-btn:hover {
+  background: rgba(74, 222, 128, 0.12);
+  color: #4ade80;
+}
+
+#pinpoint-root .pp-bar-sep {
+  width: 1px;
+  height: 20px;
+  background: var(--pp-border);
+  margin: 0 1px;
+  flex-shrink: 0;
+}
+
+/* ── annotation count badge (#6) ─────────────────────── */
+#pinpoint-root .pp-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--pp-text-dim);
+  padding: 0 6px;
+  min-width: 16px;
+  text-align: center;
+  line-height: 36px;
+  flex-shrink: 0;
+}
+
+/* ── toggle button (visible when bar hidden) ─────────── */
+#pinpoint-root .pp-toggle {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 1px solid var(--pp-border);
+  background: linear-gradient(180deg, rgba(42, 42, 42, 0.92) 0%, rgba(34, 34, 34, 0.92) 100%);
+  color: var(--pp-text-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2147483647;
+  box-shadow:
+    var(--pp-shadow),
+    inset 0 1px 0 rgba(255,255,255,0.06);
+  transition: background 150ms, color 150ms, transform 150ms;
+  pointer-events: auto;
+  outline: none;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+#pinpoint-root .pp-toggle:hover {
+  color: var(--pp-accent);
+  transform: scale(1.06);
+}
+
+/* ── popover (#15 — max-width, #16 — backdrop blur) ──── */
+#pinpoint-root .pp-popover {
+  position: fixed;
+  width: 320px;
+  max-width: calc(100vw - 16px);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: linear-gradient(180deg, rgba(42, 42, 42, 0.92) 0%, rgba(36, 36, 36, 0.92) 100%);
+  border: 1px solid var(--pp-border);
+  border-radius: 16px;
+  padding: 10px 10px 8px;
+  z-index: 2147483646;
+  box-shadow:
+    var(--pp-shadow),
+    inset 0 1px 0 rgba(255,255,255,0.05);
+  pointer-events: auto;
+  animation: pp-pop-in 120ms ease;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+@keyframes pp-pop-in {
+  from { opacity: 0; transform: scale(0.95) translateY(4px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+#pinpoint-root .pp-pop-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 13.5px;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  color: var(--pp-text);
+  padding: 2px 0;
+  resize: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+  max-height: 160px;
+  line-height: 1.5;
+}
+
+#pinpoint-root .pp-pop-input::placeholder {
+  color: #666;
+}
+
+#pinpoint-root .pp-pop-btns {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+#pinpoint-root .pp-pop-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: background 150ms, color 150ms, box-shadow 150ms, opacity 150ms;
+  outline: none;
+}
+
+#pinpoint-root .pp-pop-submit {
+  background: var(--pp-border);
+  color: #555;
+}
+
+#pinpoint-root .pp-pop-submit.pp-submit-on {
+  background: linear-gradient(180deg, #e07020 0%, var(--pp-accent) 100%);
+  color: #fff;
+  box-shadow:
+    0 1px 4px rgba(212, 98, 14, 0.3),
+    inset 0 1px 0 rgba(255,255,255,0.15);
+}
+
+#pinpoint-root .pp-pop-submit.pp-submit-on:hover {
+  background: linear-gradient(180deg, var(--pp-accent) 0%, var(--pp-accent-hover) 100%);
+}
+
+#pinpoint-root .pp-pop-delete {
+  background: transparent;
+  color: var(--pp-text-dim);
+}
+
+#pinpoint-root .pp-pop-delete:hover {
+  background: #dc2626;
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
+}
+
+/* ── focus-visible (#14) ─────────────────────────────── */
+#pinpoint-root .pp-bar-btn:focus-visible,
+#pinpoint-root .pp-toggle:focus-visible,
+#pinpoint-root .pp-pin:focus-visible,
+#pinpoint-root .pp-pop-btn:focus-visible {
+  outline: 2px solid var(--pp-accent);
+  outline-offset: 2px;
+}
+
+/* ── icon flash transition ───────────────────────────── */
+#pinpoint-root .pp-flash-out {
+  filter: blur(4px);
+  opacity: 0;
+}
+
+#pinpoint-root .pp-flash-in {
+  color: #22c55e;
+}
+
+/* ── shake animation (#2 — empty state feedback) ─────── */
+@keyframes pp-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-3px); }
+  40% { transform: translateX(3px); }
+  60% { transform: translateX(-2px); }
+  80% { transform: translateX(2px); }
+}
+
+#pinpoint-root .pp-shake {
+  animation: pp-shake 300ms ease;
+}

@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Feedpin",
+  "version": "1.0",
+  "description": "Design review annotations for any web page",
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

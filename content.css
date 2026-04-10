@@ -404,3 +404,72 @@ html.pp-commenting body * {
 #pinpoint-root .pp-shake {
   animation: pp-shake 300ms ease;
 }
+
+/* ── shortcuts panel ────────────────────────────────── */
+#pinpoint-root .pp-shortcuts {
+  position: fixed;
+  bottom: 76px;
+  left: 20px;
+  background: linear-gradient(180deg, rgba(42, 42, 42, 0.95) 0%, rgba(30, 30, 30, 0.95) 100%);
+  border: 1px solid var(--pp-border);
+  border-radius: 16px;
+  padding: 14px 16px;
+  z-index: 2147483647;
+  box-shadow:
+    var(--pp-shadow),
+    inset 0 1px 0 rgba(255,255,255,0.05);
+  pointer-events: auto;
+  animation: pp-pop-in 120ms ease;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+#pinpoint-root .pp-sc-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--pp-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+
+#pinpoint-root .pp-sc-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 0;
+}
+
+#pinpoint-root .pp-sc-label {
+  font-size: 13px;
+  color: var(--pp-text);
+}
+
+#pinpoint-root .pp-sc-keys {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+#pinpoint-root .pp-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 7px;
+  background: var(--pp-bg);
+  border: 1px solid var(--pp-border);
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  color: var(--pp-text);
+  box-shadow: var(--pp-inset);
+  line-height: 1;
+}
+
+#pinpoint-root .pp-btn-shortcuts.pp-sc-open {
+  background: var(--pp-bg-light);
+  color: var(--pp-text);
+}

@@ -51,6 +51,7 @@
     arrowUp:     'M205.66,117.66a8,8,0,0,1-11.32,0L136,59.31V216a8,8,0,0,1-16,0V59.31L61.66,117.66a8,8,0,0,1-11.32-11.32l72-72a8,8,0,0,1,11.32,0l72,72A8,8,0,0,1,205.66,117.66Z',
     check:       'M229.66,77.66l-128,128a8,8,0,0,1-11.32,0l-56-56a8,8,0,0,1,11.32-11.32L96,188.69,218.34,66.34a8,8,0,0,1,11.32,11.32Z',
     undo:        'M224,128a96,96,0,0,1-94.71,96H128A95.38,95.38,0,0,1,62.1,197.8a8,8,0,0,1,11-11.63A80,80,0,1,0,71.43,71.39a3.07,3.07,0,0,1-.26.25L44.59,96H72a8,8,0,0,1,0,16H24a8,8,0,0,1-8-8V56a8,8,0,0,1,16,0V85.8L60.25,60A96,96,0,0,1,224,128Z',
+    question:    'M140,180a12,12,0,1,1-12-12A12,12,0,0,1,140,180ZM128,72c-22.06,0-40,16.15-40,36v4a8,8,0,0,0,16,0v-4c0-11.03,10.77-20,24-20s24,8.97,24,20-10.77,20-24,20a8,8,0,0,0-8,8v8a8,8,0,0,0,16,0v-.72c18.24-3.35,32-17.9,32-35.28C168,88.15,150.06,72,128,72Zm0-48A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Z',
   };
 
   var ico = {
@@ -64,6 +65,7 @@
     trashSm:  ph(P.trash, 15),
     check:    ph(P.check),
     undo:     ph(P.undo),
+    question: ph(P.question),
   };
 
   var logoSvg = '<svg width="22" height="18" viewBox="0 0 319 260" fill="currentColor"><path d="M112.506 10.5C112.506 4.70102 117.207 8.24649e-06 123.006 0C128.805 0 133.506 4.70101 133.506 10.5V187.303L190.288 51.8965C197.377 34.992 213.917 23.9922 232.248 23.9922H308.132C313.931 23.9922 318.632 28.6932 318.632 34.4922C318.632 40.2911 313.931 44.9922 308.132 44.9922H232.248C222.377 44.9922 213.471 50.9152 209.654 60.0176L126.168 259.104L2.58373 117.271C-1.22584 112.898 -0.769813 106.267 3.60229 102.457C7.97441 98.6475 14.6062 99.1035 18.4158 103.476L112.506 211.459V10.5Z"/></svg>';
@@ -97,6 +99,7 @@
     '<div class="pp-bar-sep"></div>' +
     '<button class="pp-bar-btn pp-btn-delete" title="Delete all \u00b7 XXX">' + ico.trash + '</button>' +
     '<div class="pp-bar-sep"></div>' +
+    '<button class="pp-bar-btn pp-btn-shortcuts" title="Shortcuts">' + ico.question + '</button>' +
     '<button class="pp-bar-btn pp-btn-close" title="Close \u00b7 Esc">' + ico.close + '</button>';
   root.appendChild(bar);
 
@@ -106,13 +109,27 @@
   toggle.innerHTML = logoSvg;
   root.appendChild(toggle);
 
+  /* ── shortcuts panel ──────────────────────────────────── */
+  var shortcutsPanel = document.createElement('div');
+  shortcutsPanel.className = 'pp-shortcuts pp-hidden';
+  shortcutsPanel.innerHTML =
+    '<div class="pp-sc-title">Keyboard shortcuts</div>' +
+    '<div class="pp-sc-row"><span class="pp-sc-label">Comment mode</span><div class="pp-sc-keys"><kbd class="pp-key">C</kbd></div></div>' +
+    '<div class="pp-sc-row"><span class="pp-sc-label">Copy annotations</span><div class="pp-sc-keys"><kbd class="pp-key">A</kbd></div></div>' +
+    '<div class="pp-sc-row"><span class="pp-sc-label">Copy & clear</span><div class="pp-sc-keys"><kbd class="pp-key">Shift</kbd><kbd class="pp-key">A</kbd></div></div>' +
+    '<div class="pp-sc-row"><span class="pp-sc-label">Delete all</span><div class="pp-sc-keys"><kbd class="pp-key">X</kbd><kbd class="pp-key">X</kbd><kbd class="pp-key">X</kbd></div></div>' +
+    '<div class="pp-sc-row"><span class="pp-sc-label">Undo delete</span><div class="pp-sc-keys"><kbd class="pp-key">Z</kbd></div></div>' +
+    '<div class="pp-sc-row"><span class="pp-sc-label">Exit comment mode</span><div class="pp-sc-keys"><kbd class="pp-key">Esc</kbd></div></div>';
+  root.appendChild(shortcutsPanel);
+
   /* ── button refs ───────────────────────────────────────── */
   var btnComment = bar.querySelector('.pp-btn-comment');
   var btnCopy    = bar.querySelector('.pp-btn-copy');
   var btnSend    = bar.querySelector('.pp-btn-send');
   var btnDelete  = bar.querySelector('.pp-btn-delete');
-  var btnClose   = bar.querySelector('.pp-btn-close');
-  var countEl    = bar.querySelector('.pp-count');
+  var btnClose      = bar.querySelector('.pp-btn-close');
+  var btnShortcuts  = bar.querySelector('.pp-btn-shortcuts');
+  var countEl       = bar.querySelector('.pp-count');
 
   /* ── activate / deactivate ─────────────────────────────── */
   function activate() {
@@ -128,6 +145,7 @@
     stopCommenting();
     hidePopover();
     hideOverlay();
+    hideShortcuts();
     clearUndoState();
     toggle.classList.remove('pp-hidden');
     bar.classList.add('pp-hidden');
@@ -456,6 +474,23 @@
     updateCount();
   }
 
+  /* ── shortcuts panel toggle ────────────────────────────── */
+  function showShortcuts() {
+    shortcutsPanel.style.width = bar.offsetWidth + 'px';
+    shortcutsPanel.classList.remove('pp-hidden');
+    btnShortcuts.classList.add('pp-sc-open');
+  }
+
+  function hideShortcuts() {
+    shortcutsPanel.classList.add('pp-hidden');
+    btnShortcuts.classList.remove('pp-sc-open');
+  }
+
+  function toggleShortcuts() {
+    if (shortcutsPanel.classList.contains('pp-hidden')) showShortcuts();
+    else hideShortcuts();
+  }
+
   /* ── element snapshots for export ────────────────────────── */
   function getOpeningTag(el) {
     if (!el.isConnected) return '';
@@ -652,6 +687,11 @@
   // Click — annotate or close popover (#1: works in ANY mode now)
   document.addEventListener('click', function (e) {
     if (!active) return;
+    if (!shortcutsPanel.classList.contains('pp-hidden') &&
+        !shortcutsPanel.contains(e.target) &&
+        !btnShortcuts.contains(e.target)) {
+      hideShortcuts();
+    }
     if (isOurUI(e.target)) return;
 
     // Close popover on any outside click, regardless of comment mode (#1)
@@ -686,6 +726,7 @@
     var k = e.key.toLowerCase();
 
     if (e.key === 'Escape') {
+      if (!shortcutsPanel.classList.contains('pp-hidden')) { hideShortcuts(); return; }
       if (commenting) stopCommenting();
       return;
     }
@@ -780,6 +821,7 @@
     e.stopPropagation();
     if (undoData) undo(); else deleteAll();
   });
+  btnShortcuts.addEventListener('click', function (e) { e.stopPropagation(); toggleShortcuts(); });
   btnClose.addEventListener('click', function (e) { e.stopPropagation(); deactivate(); });
   toggle.addEventListener('click', function (e) { e.stopPropagation(); activate(); });
 

@@ -289,13 +289,22 @@
 
   function positionPop(el, pop) {
     var r = el.getBoundingClientRect();
-    var above = r.bottom > window.innerHeight * 0.6;
+    var vh = window.innerHeight;
+    var visTop = Math.max(0, r.top);
+    var visBottom = Math.min(vh, r.bottom);
+    var above = visBottom > vh * 0.6;
 
     if (above) {
-      pop.style.bottom = (window.innerHeight - r.top + 10) + 'px';
-      pop.style.top = 'auto';
+      var bottomVal = vh - visTop + 10;
+      if (bottomVal > vh - 8) {
+        pop.style.top = '8px';
+        pop.style.bottom = 'auto';
+      } else {
+        pop.style.bottom = bottomVal + 'px';
+        pop.style.top = 'auto';
+      }
     } else {
-      pop.style.top = (r.bottom + 10) + 'px';
+      pop.style.top = Math.min(visBottom + 10, vh - 80) + 'px';
       pop.style.bottom = 'auto';
     }
 
@@ -754,6 +763,25 @@
   });
   btnClose.addEventListener('click', function (e) { e.stopPropagation(); deactivate(); });
   toggle.addEventListener('click', function (e) { e.stopPropagation(); activate(); });
+
+  /* ── site disable/enable ────────────────────────────────── */
+  chrome.storage.local.get('disabledHosts', function (data) {
+    var list = data.disabledHosts || [];
+    if (list.indexOf(location.hostname) !== -1) {
+      toggle.classList.add('pp-hidden');
+    }
+  });
+
+  chrome.runtime.onMessage.addListener(function (msg) {
+    if (msg.type === 'feedpin-toggle') {
+      if (msg.enabled) {
+        toggle.classList.remove('pp-hidden');
+      } else {
+        if (active) deactivate();
+        toggle.classList.add('pp-hidden');
+      }
+    }
+  });
 
   /* ── init ──────────────────────────────────────────────── */
   pinLayer.classList.add('pp-hidden');

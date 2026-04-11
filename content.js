@@ -16,6 +16,10 @@
   var undoData = null;   // { items: [...], nextId }
   var undoTimer = null;
 
+  /* ── keyboard navigation state ──────────────────────────── */
+  var keyNavEnabled = false;
+  var keyNavEl = null;
+
   /* ── flash timer tracking (issue #9) ───────────────────── */
   var flashTimers = new Map();
 
@@ -52,7 +56,7 @@
     arrowUp:     'M205.66,117.66a8,8,0,0,1-11.32,0L136,59.31V216a8,8,0,0,1-16,0V59.31L61.66,117.66a8,8,0,0,1-11.32-11.32l72-72a8,8,0,0,1,11.32,0l72,72A8,8,0,0,1,205.66,117.66Z',
     check:       'M229.66,77.66l-128,128a8,8,0,0,1-11.32,0l-56-56a8,8,0,0,1,11.32-11.32L96,188.69,218.34,66.34a8,8,0,0,1,11.32,11.32Z',
     undo:        'M224,128a96,96,0,0,1-94.71,96H128A95.38,95.38,0,0,1,62.1,197.8a8,8,0,0,1,11-11.63A80,80,0,1,0,71.43,71.39a3.07,3.07,0,0,1-.26.25L44.59,96H72a8,8,0,0,1,0,16H24a8,8,0,0,1-8-8V56a8,8,0,0,1,16,0V85.8L60.25,60A96,96,0,0,1,224,128Z',
-    question:    'M140,180a12,12,0,1,1-12-12A12,12,0,0,1,140,180ZM128,72c-22.06,0-40,16.15-40,36v4a8,8,0,0,0,16,0v-4c0-11.03,10.77-20,24-20s24,8.97,24,20-10.77,20-24,20a8,8,0,0,0-8,8v8a8,8,0,0,0,16,0v-.72c18.24-3.35,32-17.9,32-35.28C168,88.15,150.06,72,128,72Zm0-48A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Z',
+    sliders:     'M64,105V40a8,8,0,0,0-16,0v65a32,32,0,0,0,0,62v49a8,8,0,0,0,16,0V167a32,32,0,0,0,0-62Zm-8,47a16,16,0,1,1,16-16A16,16,0,0,1,56,152Zm80-95V40a8,8,0,0,0-16,0V57a32,32,0,0,0,0,62v97a8,8,0,0,0,16,0V119a32,32,0,0,0,0-62Zm-8,47a16,16,0,1,1,16-16A16,16,0,0,1,128,104Zm104,64a32.06,32.06,0,0,0-24-31V40a8,8,0,0,0-16,0v97a32,32,0,0,0,0,62v17a8,8,0,0,0,16,0V199A32.06,32.06,0,0,0,232,168Zm-32,16a16,16,0,1,1,16-16A16,16,0,0,1,200,184Z',
   };
 
   var ico = {
@@ -66,7 +70,7 @@
     trashSm:  ph(P.trash, 15),
     check:    ph(P.check),
     undo:     ph(P.undo),
-    question: ph(P.question),
+    sliders:  ph(P.sliders),
   };
 
   var logoSvg = '<svg width="22" height="17" viewBox="83 68 378 289" fill="none" stroke="currentColor" stroke-width="40" stroke-linecap="round" stroke-linejoin="round"><path d="M113.279 198.073L225.785 327.192V98.2M225.785 327.192L331.751 122.192H430.911"/></svg>';
@@ -101,7 +105,7 @@
     '<div class="pp-bar-sep"></div>' +
     '<button class="pp-bar-btn pp-btn-delete" data-tip="Delete all" data-keys="X,X,X" aria-label="Delete all">' + ico.trash + '</button>' +
     '<div class="pp-bar-sep"></div>' +
-    '<button class="pp-bar-btn pp-btn-shortcuts" data-tip="Shortcuts" aria-label="Shortcuts">' + ico.question + '</button>' +
+    '<button class="pp-bar-btn pp-btn-shortcuts" data-tip="Menu" aria-label="Menu">' + ico.sliders + '</button>' +
     '<button class="pp-bar-btn pp-btn-close" data-tip="Close" data-keys="Esc" aria-label="Close">' + ico.close + '</button>';
   root.appendChild(bar);
 
@@ -116,20 +120,41 @@
   toggle.innerHTML = logoSvg;
   root.appendChild(toggle);
 
-  /* ── shortcuts panel ──────────────────────────────────── */
-  var shortcutsPanel = document.createElement('div');
-  shortcutsPanel.className = 'pp-shortcuts pp-hidden';
-  shortcutsPanel.setAttribute('role', 'region');
-  shortcutsPanel.setAttribute('aria-label', 'Keyboard shortcuts');
-  shortcutsPanel.innerHTML =
-    '<div class="pp-sc-title">Keyboard shortcuts</div>' +
-    '<div class="pp-sc-row"><span class="pp-sc-label">Comment mode</span><div class="pp-sc-keys"><kbd class="pp-key">C</kbd></div></div>' +
-    '<div class="pp-sc-row"><span class="pp-sc-label">Copy annotations</span><div class="pp-sc-keys"><kbd class="pp-key">A</kbd></div></div>' +
-    '<div class="pp-sc-row"><span class="pp-sc-label">Copy & clear</span><div class="pp-sc-keys"><kbd class="pp-key">Shift</kbd><kbd class="pp-key">A</kbd></div></div>' +
-    '<div class="pp-sc-row"><span class="pp-sc-label">Delete all</span><div class="pp-sc-keys"><kbd class="pp-key">X</kbd><kbd class="pp-key">X</kbd><kbd class="pp-key">X</kbd></div></div>' +
-    '<div class="pp-sc-row"><span class="pp-sc-label">Undo delete</span><div class="pp-sc-keys"><kbd class="pp-key">Z</kbd></div></div>' +
-    '<div class="pp-sc-row"><span class="pp-sc-label">Exit comment mode</span><div class="pp-sc-keys"><kbd class="pp-key">Esc</kbd></div></div>';
-  root.appendChild(shortcutsPanel);
+  /* ── menu panel (settings + shortcuts) ─────────────────── */
+  var menuPanel = document.createElement('div');
+  menuPanel.className = 'pp-menu pp-hidden';
+  menuPanel.setAttribute('role', 'region');
+  menuPanel.setAttribute('aria-label', 'Menu');
+  menuPanel.innerHTML =
+    '<div class="pp-menu-section">' +
+      '<div class="pp-sc-title">Settings</div>' +
+      '<div class="pp-menu-row">' +
+        '<span class="pp-menu-label">Keyboard navigation</span>' +
+        '<label class="pp-switch-label">' +
+          '<input type="checkbox" class="pp-switch-input pp-keynav-toggle">' +
+          '<span class="pp-switch-track"></span>' +
+        '</label>' +
+      '</div>' +
+    '</div>' +
+    '<div class="pp-menu-divider"></div>' +
+    '<div class="pp-menu-section">' +
+      '<div class="pp-sc-title">Shortcuts</div>' +
+      '<div class="pp-sc-row"><span class="pp-sc-label">Comment mode</span><div class="pp-sc-keys"><kbd class="pp-key">C</kbd></div></div>' +
+      '<div class="pp-sc-row"><span class="pp-sc-label">Copy annotations</span><div class="pp-sc-keys"><kbd class="pp-key">A</kbd></div></div>' +
+      '<div class="pp-sc-row"><span class="pp-sc-label">Copy & clear</span><div class="pp-sc-keys"><kbd class="pp-key">Shift</kbd><kbd class="pp-key">A</kbd></div></div>' +
+      '<div class="pp-sc-row"><span class="pp-sc-label">Delete all</span><div class="pp-sc-keys"><kbd class="pp-key">X</kbd><kbd class="pp-key">X</kbd><kbd class="pp-key">X</kbd></div></div>' +
+      '<div class="pp-sc-row"><span class="pp-sc-label">Undo delete</span><div class="pp-sc-keys"><kbd class="pp-key">Z</kbd></div></div>' +
+      '<div class="pp-sc-row"><span class="pp-sc-label">Close</span><div class="pp-sc-keys"><kbd class="pp-key">Esc</kbd></div></div>' +
+    '</div>' +
+    '<div class="pp-menu-divider"></div>' +
+    '<div class="pp-menu-section">' +
+      '<div class="pp-sc-title">Navigation</div>' +
+      '<div class="pp-sc-row"><span class="pp-sc-label">Move selection</span><div class="pp-sc-keys"><kbd class="pp-key">\u2190</kbd><kbd class="pp-key">\u2191</kbd><kbd class="pp-key">\u2193</kbd><kbd class="pp-key">\u2192</kbd></div></div>' +
+      '<div class="pp-sc-row"><span class="pp-sc-label">Parent / child</span><div class="pp-sc-keys"><kbd class="pp-key">Shift</kbd><kbd class="pp-key">\u2191</kbd><kbd class="pp-key">\u2193</kbd></div></div>' +
+      '<div class="pp-sc-row"><span class="pp-sc-label">Cycle elements</span><div class="pp-sc-keys"><kbd class="pp-key">Tab</kbd></div></div>' +
+      '<div class="pp-sc-row"><span class="pp-sc-label">Annotate</span><div class="pp-sc-keys"><kbd class="pp-key">Enter</kbd></div></div>' +
+    '</div>';
+  root.appendChild(menuPanel);
 
   /* ── button refs ───────────────────────────────────────── */
   var btnComment = bar.querySelector('.pp-btn-comment');
@@ -185,7 +210,7 @@
     stopCommenting();
     hidePopover();
     hideOverlay();
-    hideShortcuts();
+    hideMenu();
     hideBarTip();
     clearUndoState();
     clearTimeout(morphTimer);
@@ -240,10 +265,21 @@
   /* ── hover overlay ─────────────────────────────────────── */
   function showOverlay(el) {
     var r = el.getBoundingClientRect();
-    overlay.style.top = r.top + 'px';
-    overlay.style.left = r.left + 'px';
-    overlay.style.width = r.width + 'px';
-    overlay.style.height = r.height + 'px';
+    var vw = window.innerWidth;
+    var vh = window.innerHeight;
+
+    // Clamp overlay to visible viewport portion (handles elements larger than screen)
+    var visTop = Math.max(0, r.top);
+    var visLeft = Math.max(0, r.left);
+    var visBottom = Math.min(vh, r.bottom);
+    var visRight = Math.min(vw, r.right);
+    var visW = Math.max(0, visRight - visLeft);
+    var visH = Math.max(0, visBottom - visTop);
+
+    overlay.style.top = visTop + 'px';
+    overlay.style.left = visLeft + 'px';
+    overlay.style.width = visW + 'px';
+    overlay.style.height = visH + 'px';
     overlay.classList.add('pp-on');
 
     var name = typeName(el);
@@ -252,13 +288,13 @@
     tip.textContent = name + (preview ? ': ' + preview : '');
 
     // Clamp tooltip to viewport (#8)
-    var tipLeft = r.left;
+    var tipLeft = visLeft;
     var tipRight = tipLeft + 280;
-    if (tipRight > window.innerWidth - 8) {
-      tipLeft = Math.max(8, window.innerWidth - 288);
+    if (tipRight > vw - 8) {
+      tipLeft = Math.max(8, vw - 288);
     }
     tip.style.left = Math.max(8, tipLeft) + 'px';
-    tip.style.top = (r.top > 30 ? r.top - 26 : r.bottom + 4) + 'px';
+    tip.style.top = (visTop > 30 ? visTop - 26 : visBottom + 4) + 'px';
     tip.classList.add('pp-on');
   }
 
@@ -269,22 +305,97 @@
   }
 
   /* ── popover ───────────────────────────────────────────── */
+  function getAnnotationsForElement(el) {
+    return annotations.filter(function (a) { return a.el === el; });
+  }
+
+  function buildCommentCard(ann, pop) {
+    var card = document.createElement('div');
+    card.className = 'pp-comment-card';
+
+    var header = document.createElement('div');
+    header.className = 'pp-comment-header';
+    var badge = document.createElement('span');
+    badge.className = 'pp-comment-badge';
+    badge.textContent = ann.id;
+    header.appendChild(badge);
+
+    var del = document.createElement('button');
+    del.className = 'pp-pop-btn pp-pop-delete';
+    del.title = 'Delete';
+    del.setAttribute('aria-label', 'Delete');
+    del.innerHTML = ico.trashSm;
+    del.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var targetEl = ann.el;
+      deleteAnnotation(ann.id);
+      // Reopen popover to refresh all badges, or close if none left
+      var remaining = getAnnotationsForElement(targetEl);
+      if (remaining.length > 0) {
+        showPopover(targetEl, remaining[0]);
+        showOverlay(targetEl);
+      } else {
+        hidePopover();
+        hideOverlay();
+      }
+    });
+    header.appendChild(del);
+    card.appendChild(header);
+
+    var input = document.createElement('textarea');
+    input.className = 'pp-pop-input';
+    input.value = ann.comment;
+    input.rows = 1;
+    input.setAttribute('aria-label', 'Annotation ' + ann.id);
+    card.appendChild(input);
+
+    function autoGrow() {
+      input.style.height = 'auto';
+      input.style.height = input.scrollHeight + 'px';
+    }
+    input.addEventListener('input', function () {
+      autoGrow();
+      ann.comment = input.value.trim();
+      persist();
+    });
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); hidePopover(); hideOverlay(); }
+      e.stopPropagation();
+    });
+    requestAnimationFrame(autoGrow);
+
+    return card;
+  }
+
   function showPopover(el, ann) {
     hidePopover();
     editingAnn = ann || null;
     popoverTarget = el;
-    var isEdit = !!ann;
+
+    // Find all annotations on this element
+    var elAnns = ann ? getAnnotationsForElement(el) : [];
+    var isEdit = elAnns.length > 0;
 
     var pop = document.createElement('div');
     pop.className = 'pp-popover';
 
+    // Show existing annotation cards
+    if (isEdit) {
+      elAnns.forEach(function (a) {
+        pop.appendChild(buildCommentCard(a, pop));
+      });
+    }
+
+    // New comment input (always shown)
+    var newSection = document.createElement('div');
+    newSection.className = 'pp-new-comment';
+
     var input = document.createElement('textarea');
     input.className = 'pp-pop-input';
-    input.placeholder = 'Add a comment';
-    input.setAttribute('aria-label', 'Annotation comment');
+    input.placeholder = isEdit ? 'Add another comment' : 'Add a comment';
+    input.setAttribute('aria-label', 'New comment');
     input.rows = 1;
-    if (isEdit) input.value = ann.comment;
-    pop.appendChild(input);
+    newSection.appendChild(input);
 
     function autoGrow() {
       input.style.height = 'auto';
@@ -295,25 +406,10 @@
     var btnRow = document.createElement('div');
     btnRow.className = 'pp-pop-btns';
 
-    if (isEdit) {
-      var del = document.createElement('button');
-      del.className = 'pp-pop-btn pp-pop-delete';
-      del.title = 'Delete';
-      del.setAttribute('aria-label', 'Delete');
-      del.innerHTML = ico.trashSm;
-      del.addEventListener('click', function (e) {
-        e.stopPropagation();
-        deleteAnnotation(ann.id);
-        hidePopover();
-        hideOverlay();
-      });
-      btnRow.appendChild(del);
-    }
-
     var submit = document.createElement('button');
     submit.className = 'pp-pop-btn pp-pop-submit';
-    submit.title = isEdit ? 'Save' : 'Add';
-    submit.setAttribute('aria-label', isEdit ? 'Save' : 'Add');
+    submit.title = 'Add';
+    submit.setAttribute('aria-label', 'Add');
     submit.innerHTML = ico.arrowUp;
     submit.disabled = true;
 
@@ -323,14 +419,13 @@
       submit.disabled = !on;
     }
     input.addEventListener('input', sync);
-    sync();
 
     submit.addEventListener('click', function (e) {
       e.stopPropagation();
       commit();
     });
     btnRow.appendChild(submit);
-    pop.appendChild(btnRow);
+    newSection.appendChild(btnRow);
 
     input.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commit(); }
@@ -338,17 +433,12 @@
       e.stopPropagation();
     });
 
-    requestAnimationFrame(autoGrow);
+    pop.appendChild(newSection);
 
     function commit() {
       var text = input.value.trim();
       if (!text) return;
-      if (isEdit) {
-        ann.comment = text;
-        persist();
-      } else {
-        addAnnotation(el, text);
-      }
+      addAnnotation(el, text);
       hidePopover();
       hideOverlay();
     }
@@ -416,8 +506,23 @@
     var ann = annotations[idx];
     if (ann.pinEl) ann.pinEl.remove();
     annotations.splice(idx, 1);
+    renumber();
     persist();
     updateCount();
+  }
+
+  function renumber() {
+    for (var i = 0; i < annotations.length; i++) {
+      var a = annotations[i];
+      a.id = i + 1;
+      if (a.pinEl) {
+        a.pinEl.textContent = a.id;
+        a.pinEl.setAttribute('aria-label', 'Annotation ' + a.id);
+        a.pinEl.classList.toggle('pp-pin-sm', a.id >= 10 && a.id < 100);
+        a.pinEl.classList.toggle('pp-pin-xs', a.id >= 100);
+      }
+    }
+    nextId = annotations.length + 1;
   }
 
   function deleteAll() {
@@ -442,6 +547,7 @@
     pinLayer.appendChild(pin);
     ann.pinEl = pin;
     positionPin(ann);
+    adaptPinTheme(ann);
 
     pin.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' || e.key === ' ') {
@@ -491,8 +597,11 @@
                  r.right > 0 && r.left < window.innerWidth;
     ann.pinEl.style.display = inView ? 'flex' : 'none';
     if (inView) {
-      ann.pinEl.style.top = (r.top - 11) + 'px';
-      ann.pinEl.style.left = (r.right - 11) + 'px';
+      // Clamp pin to stay fully visible within viewport
+      var top = Math.max(2, Math.min(r.top - 11, window.innerHeight - 28));
+      var left = Math.max(2, Math.min(r.right - 11, window.innerWidth - 28));
+      ann.pinEl.style.top = top + 'px';
+      ann.pinEl.style.left = left + 'px';
     }
   }
 
@@ -501,6 +610,14 @@
     if (popover && popoverTarget) {
       positionPop(popoverTarget, popover);
       showOverlay(popoverTarget);
+    } else if (commenting && lastMouseX >= 0) {
+      var el = document.elementFromPoint(lastMouseX, lastMouseY);
+      if (el && !isSkippable(el) && !isOurUI(el)) {
+        hovered = el;
+        showOverlay(el);
+      } else {
+        hideOverlay();
+      }
     }
   }
 
@@ -551,21 +668,162 @@
     updateCount();
   }
 
-  /* ── shortcuts panel toggle ────────────────────────────── */
-  function showShortcuts() {
-    shortcutsPanel.style.width = bar.offsetWidth + 'px';
-    shortcutsPanel.classList.remove('pp-hidden');
+  /* ── menu panel toggle ─────────────────────────────────── */
+  function showMenu() {
+    menuPanel.style.width = Math.max(bar.offsetWidth, 280) + 'px';
+    menuPanel.classList.remove('pp-hidden');
     btnShortcuts.classList.add('pp-sc-open');
   }
 
-  function hideShortcuts() {
-    shortcutsPanel.classList.add('pp-hidden');
+  function hideMenu() {
+    menuPanel.classList.add('pp-hidden');
     btnShortcuts.classList.remove('pp-sc-open');
   }
 
-  function toggleShortcuts() {
-    if (shortcutsPanel.classList.contains('pp-hidden')) showShortcuts();
-    else hideShortcuts();
+  function toggleMenu() {
+    if (menuPanel.classList.contains('pp-hidden')) showMenu();
+    else hideMenu();
+  }
+
+  /* ── keyboard navigation ────────────────────────────────── */
+  var NAV_SELECTOR = 'a, button, input, select, textarea, img, video, audio, ' +
+      'h1, h2, h3, h4, h5, h6, li, p, figure, blockquote, pre, ' +
+      'header, nav, main, aside, footer, section, article, form, table, ' +
+      '[role], [id]:not(script):not(style):not(link)';
+
+  function getNavigableElements() {
+    var all = document.querySelectorAll(NAV_SELECTOR);
+    var result = [];
+    for (var i = 0; i < all.length; i++) {
+      var el = all[i];
+      if (isOurUI(el) || isSkippable(el)) continue;
+      if (el.tagName === 'SCRIPT' || el.tagName === 'STYLE' || el.tagName === 'LINK') continue;
+      var r = el.getBoundingClientRect();
+      if (r.width < 8 || r.height < 8) continue;
+      if (r.bottom < 0 || r.top > window.innerHeight) continue;
+      if (r.right < 0 || r.left > window.innerWidth) continue;
+      result.push(el);
+    }
+    return result;
+  }
+
+  function getInitialElement() {
+    var cx = window.innerWidth / 2;
+    var cy = window.innerHeight / 2;
+    var elems = getNavigableElements();
+    var best = null, bestDist = Infinity;
+    for (var i = 0; i < elems.length; i++) {
+      var r = elems[i].getBoundingClientRect();
+      var dx = r.left + r.width / 2 - cx;
+      var dy = r.top + r.height / 2 - cy;
+      var d = dx * dx + dy * dy;
+      if (d < bestDist) { bestDist = d; best = elems[i]; }
+    }
+    return best;
+  }
+
+  function isFixedOrSticky(el) {
+    try {
+      var pos = getComputedStyle(el).position;
+      return pos === 'fixed' || pos === 'sticky';
+    } catch (e) { return false; }
+  }
+
+  function findNearest(from, direction) {
+    var fr = from.getBoundingClientRect();
+    var fcx = fr.left + fr.width / 2;
+    var fcy = fr.top + fr.height / 2;
+    var fromFixed = isFixedOrSticky(from);
+    var elems = getNavigableElements();
+    var best = null, bestScore = Infinity;
+
+    for (var i = 0; i < elems.length; i++) {
+      var el = elems[i];
+      if (el === from || from.contains(el)) continue;
+
+      // Skip fixed/sticky elements when navigating from non-fixed content
+      // (prevents getting stuck on fixed headers/navs)
+      if (!fromFixed && isFixedOrSticky(el)) continue;
+
+      var r = el.getBoundingClientRect();
+      var cx = r.left + r.width / 2;
+      var cy = r.top + r.height / 2;
+      var dx = cx - fcx, dy = cy - fcy;
+
+      switch (direction) {
+        case 'up':    if (dy >= -2) continue; break;
+        case 'down':  if (dy <= 2) continue; break;
+        case 'left':  if (dx >= -2) continue; break;
+        case 'right': if (dx <= 2) continue; break;
+      }
+
+      var score = (direction === 'up' || direction === 'down')
+        ? Math.abs(dy) + Math.abs(dx) * 2.5
+        : Math.abs(dx) + Math.abs(dy) * 2.5;
+
+      if (score < bestScore) { bestScore = score; best = el; }
+    }
+    return best;
+  }
+
+  function cycleElement(forward) {
+    var all = getNavigableElements();
+    if (all.length === 0) return null;
+    var cur = hovered;
+    if (!cur) return all[0];
+    var idx = all.indexOf(cur);
+    if (idx === -1) return all[0];
+    return forward ? all[(idx + 1) % all.length] : all[(idx - 1 + all.length) % all.length];
+  }
+
+  function selectParent(el) {
+    var p = el.parentElement;
+    while (p && p !== document.body && p !== document.documentElement) {
+      if (!isOurUI(p) && !isSkippable(p)) {
+        var r = p.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0) return p;
+      }
+      p = p.parentElement;
+    }
+    return null;
+  }
+
+  function selectChild(el) {
+    // Try direct visible children first
+    var visible = [];
+    for (var i = 0; i < el.children.length; i++) {
+      var child = el.children[i];
+      if (isOurUI(child) || child.tagName === 'SCRIPT' || child.tagName === 'STYLE' || child.tagName === 'LINK') continue;
+      var r = child.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) visible.push(child);
+    }
+    if (visible.length === 0) return null;
+    // If only one visible child that fills the parent, skip into it recursively
+    if (visible.length === 1) {
+      var pr = el.getBoundingClientRect();
+      var cr = visible[0].getBoundingClientRect();
+      var fills = Math.abs(cr.width - pr.width) < 4 && Math.abs(cr.height - pr.height) < 4;
+      if (fills) {
+        var deeper = selectChild(visible[0]);
+        return deeper || visible[0];
+      }
+    }
+    return visible[0];
+  }
+
+  function scrollIntoViewIfNeeded(el) {
+    var r = el.getBoundingClientRect();
+    if (r.top < 0 || r.bottom > window.innerHeight) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+
+  function keyNavTo(el) {
+    if (!el) return;
+    hovered = el;
+    keyNavEl = el;
+    showOverlay(el);
+    scrollIntoViewIfNeeded(el);
   }
 
   /* ── element snapshots for export ────────────────────────── */
@@ -615,7 +873,8 @@
   function formatMarkdown() {
     var lines = [
       'Design Review - ' + document.title,
-      'URL: ' + location.href, '',
+      'URL: ' + location.href,
+      'Viewport: ' + window.innerWidth + '\u00d7' + window.innerHeight, '',
     ];
     annotations.forEach(function (ann) {
       lines.push(ann.id + '. [' + ann.type + '] ' + ann.selector);
@@ -762,6 +1021,47 @@
     return CSS && CSS.escape ? CSS.escape(s) : s.replace(/([^\w-])/g, '\\$1');
   }
 
+  /* ── pin contrast adaptation ───────────────────────────── */
+  function getEffectiveBgColor(el) {
+    var cur = el;
+    while (cur && cur !== document.documentElement) {
+      var bg = getComputedStyle(cur).backgroundColor;
+      if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') return bg;
+      cur = cur.parentElement;
+    }
+    return 'rgb(255, 255, 255)';
+  }
+
+  function parseRgb(str) {
+    var m = str.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+    return m ? { r: +m[1], g: +m[2], b: +m[3] } : { r: 255, g: 255, b: 255 };
+  }
+
+  function srgbLuminance(r, g, b) {
+    var rs = r / 255, gs = g / 255, bs = b / 255;
+    rs = rs <= 0.03928 ? rs / 12.92 : Math.pow((rs + 0.055) / 1.055, 2.4);
+    gs = gs <= 0.03928 ? gs / 12.92 : Math.pow((gs + 0.055) / 1.055, 2.4);
+    bs = bs <= 0.03928 ? bs / 12.92 : Math.pow((bs + 0.055) / 1.055, 2.4);
+    return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
+  }
+
+  function adaptPinTheme(ann) {
+    if (!ann.el.isConnected || !ann.pinEl) return;
+    var rgb = parseRgb(getEffectiveBgColor(ann.el));
+    var lum = srgbLuminance(rgb.r, rgb.g, rgb.b);
+
+    // Distance to our accent orange (#d4620e = 212,98,14)
+    var dr = rgb.r - 212, dg = rgb.g - 98, db = rgb.b - 14;
+    var orangeDist = Math.sqrt(dr * dr + dg * dg + db * db);
+
+    ann.pinEl.classList.remove('pp-pin-light', 'pp-pin-alt');
+    if (orangeDist < 110) {
+      ann.pinEl.classList.add('pp-pin-alt');
+    } else if (lum > 0.45) {
+      ann.pinEl.classList.add('pp-pin-light');
+    }
+  }
+
   /* ── helpers ───────────────────────────────────────────── */
   function typeName(el) { return TAG[el.tagName] || el.tagName.toLowerCase(); }
 
@@ -782,7 +1082,11 @@
   /* ── events ────────────────────────────────────────────── */
 
   // Mousemove — hover highlight
+  var lastMouseX = -1, lastMouseY = -1;
+
   document.addEventListener('mousemove', function (e) {
+    lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
     if (!active || !commenting || popover) return;
     if (isOurUI(e.target)) { hideOverlay(); return; }
     var el = document.elementFromPoint(e.clientX, e.clientY);
@@ -793,10 +1097,10 @@
   // Click — annotate or close popover (#1: works in ANY mode now)
   document.addEventListener('click', function (e) {
     if (!active) return;
-    if (!shortcutsPanel.classList.contains('pp-hidden') &&
-        !shortcutsPanel.contains(e.target) &&
+    if (!menuPanel.classList.contains('pp-hidden') &&
+        !menuPanel.contains(e.target) &&
         !btnShortcuts.contains(e.target)) {
-      hideShortcuts();
+      hideMenu();
     }
     if (isOurUI(e.target)) return;
 
@@ -832,12 +1136,60 @@
     var k = e.key.toLowerCase();
 
     if (e.key === 'Escape') {
-      if (!shortcutsPanel.classList.contains('pp-hidden')) { hideShortcuts(); return; }
+      if (!menuPanel.classList.contains('pp-hidden')) { hideMenu(); return; }
       if (commenting) stopCommenting();
       return;
     }
 
     if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+    // ── keyboard navigation (when enabled + comment mode) ──
+    if (keyNavEnabled && commenting) {
+      var dir = null;
+      if (e.key === 'ArrowUp' && !e.shiftKey) dir = 'up';
+      else if (e.key === 'ArrowDown' && !e.shiftKey) dir = 'down';
+      else if (e.key === 'ArrowLeft') dir = 'left';
+      else if (e.key === 'ArrowRight') dir = 'right';
+
+      if (dir) {
+        e.preventDefault();
+        keyNavTo(hovered ? findNearest(hovered, dir) : getInitialElement());
+        resetTaps();
+        return;
+      }
+
+      // Shift+Up — parent
+      if (e.key === 'ArrowUp' && e.shiftKey && hovered) {
+        e.preventDefault();
+        keyNavTo(selectParent(hovered));
+        resetTaps();
+        return;
+      }
+
+      // Shift+Down — child
+      if (e.key === 'ArrowDown' && e.shiftKey && hovered) {
+        e.preventDefault();
+        keyNavTo(selectChild(hovered));
+        resetTaps();
+        return;
+      }
+
+      // Tab / Shift+Tab — cycle
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        keyNavTo(cycleElement(!e.shiftKey));
+        resetTaps();
+        return;
+      }
+
+      // Enter — annotate hovered element
+      if (e.key === 'Enter' && hovered && !isSkippable(hovered)) {
+        e.preventDefault();
+        showPopover(hovered);
+        resetTaps();
+        return;
+      }
+    }
 
     // Z — undo
     if (k === 'z' && undoData) {
@@ -927,9 +1279,28 @@
     e.stopPropagation();
     if (undoData) undo(); else deleteAll();
   });
-  btnShortcuts.addEventListener('click', function (e) { e.stopPropagation(); toggleShortcuts(); });
+  btnShortcuts.addEventListener('click', function (e) { e.stopPropagation(); toggleMenu(); });
   btnClose.addEventListener('click', function (e) { e.stopPropagation(); deactivate(); });
   toggle.addEventListener('click', function (e) { e.stopPropagation(); activate(); });
+
+  /* ── menu settings wiring ─────────────────────────────── */
+  var keyNavToggle = menuPanel.querySelector('.pp-keynav-toggle');
+
+  keyNavToggle.addEventListener('change', function () {
+    keyNavEnabled = this.checked;
+    chrome.storage.local.set({ keyNavEnabled: keyNavEnabled });
+  });
+
+  // Stop clicks inside menu from propagating (prevents toolbar close)
+  menuPanel.addEventListener('click', function (e) { e.stopPropagation(); });
+
+  // Restore settings
+  chrome.storage.local.get('keyNavEnabled', function (data) {
+    if (data.keyNavEnabled !== undefined) {
+      keyNavEnabled = !!data.keyNavEnabled;
+      keyNavToggle.checked = keyNavEnabled;
+    }
+  });
 
   /* ── custom tooltips ──────────────────────────────────── */
   var barTipTimer = null;

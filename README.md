@@ -32,19 +32,22 @@ Each annotation captures the CSS selector, the element's opening HTML tag (with 
 ```
 Design Review - Page Title
 URL: https://example.com/page
+Viewport: 1440×900
 
-1. Element: nav.main-nav > ul > li:nth-of-type(3) (list item)
+1. [list item] nav.main-nav > ul > li:nth-of-type(3)
+   In: nav
    HTML: <li class="flex items-center gap-6 px-4 py-2 text-sm">
    Text: "Products"
    Comment: Spacing between nav items is inconsistent, should be 16px
 
-2. Element: #hero-heading (heading 1)
+2. [heading 1] #hero-heading
+   In: main > section
    HTML: <h1 class="text-5xl font-light text-gray-700">
    Text: "Welcome to Our Platform"
    Comment: Font weight looks lighter than the design spec
 ```
 
-The HTML tag line is what makes this work across any framework. Tailwind, CSS modules, BEM, styled-components - the agent sees the actual classes on the rendered element and can grep your codebase for them.
+The viewport line helps AI agents understand which breakpoint you were reviewing at. The HTML tag line is what makes this work across any framework. Tailwind, CSS modules, BEM, styled-components - the agent sees the actual classes on the rendered element and can grep your codebase for them.
 
 ## Keyboard shortcuts
 
@@ -55,7 +58,24 @@ The HTML tag line is what makes this work across any framework. Tailwind, CSS mo
 | **Shift+A** | Copy all & clear |
 | **XXX** | Delete all annotations |
 | **Z** | Undo delete (5s window) |
-| **Esc** | Exit comment mode / close |
+| **Esc** | Close / exit comment mode |
+
+### Keyboard navigation
+
+Enable keyboard navigation in the in-page menu (click the sliders icon on the toolbar). When active in comment mode:
+
+| Key | Action |
+|---|---|
+| **Arrow keys** | Move selection spatially (up/down/left/right) |
+| **Shift+Up/Down** | Select parent or child element |
+| **Tab / Shift+Tab** | Cycle through elements in DOM order |
+| **Enter** | Annotate the selected element |
+
+This lets you select a card container vs. the text inside it, which matters for precise design review.
+
+## Pin contrast
+
+Pins automatically adapt to the background behind them. On light backgrounds they gain elevation shadow for depth. On warm/orange backgrounds close to the pin accent color, pins shift to an indigo palette so they stay visible.
 
 ## Extension menu
 
@@ -64,12 +84,24 @@ Right-click the Feedpin icon or click it to open the popup:
 - **Enabled** toggle to disable Feedpin on the current site
 - **Dev only** mode to restrict Feedpin to localhost, 127.0.0.1, and .local domains
 
+The in-page config button (sliders icon) opens a settings panel with:
+
+- **Keyboard navigation** toggle
+- Full keyboard shortcuts reference
+
+## Multiple annotations per element
+
+Click the same element multiple times to add multiple comments. All annotations on one element open together in the popover, each with its own numbered badge. Deleting any annotation renumbers the rest sequentially.
+
 ## Works everywhere
 
 - Any HTTP/HTTPS page, any codebase
 - Single-page apps (detects client-side navigation)
 - Annotations persist per page in localStorage
+- Highlight follows the cursor during scroll
 - CSS selector builder filters out generated class names (CSS-in-JS, Tailwind hashes, etc.)
+- Pin colors auto-adapt to page backgrounds for visibility
+- Pins stay visible at viewport edges (clamped positioning)
 
 ## License
 

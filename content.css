@@ -1,16 +1,23 @@
-/* ── variables & root ─────────────────────────────────── */
 #pinpoint-root {
-  --pp-accent: #d4620e;
-  --pp-accent-hover: #b8540c;
-  --pp-accent-gradient: linear-gradient(180deg, #e07020 0%, var(--pp-accent) 100%);
-  --pp-bg: #232323;
-  --pp-bg-light: #2e2e2e;
-  --pp-text: #f0f0f0;
-  --pp-text-dim: #888;
-  --pp-border: #3a3a3a;
-  --pp-shadow: 0 6px 28px rgba(0, 0, 0, 0.55), 0 1px 3px rgba(0, 0, 0, 0.3);
-  --pp-inset: inset 0 1px 0 rgba(255,255,255,0.04), inset 0 -1px 0 rgba(0,0,0,0.2);
-
+  --pp-accent: #e85102;
+  --pp-accent-soft: rgba(232, 81, 2, 0.14);
+  --pp-accent-border: rgba(232, 81, 2, 0.42);
+  --pp-bg: rgba(26, 24, 22, 0.76);
+  --pp-bg-strong: rgba(34, 31, 28, 0.88);
+  --pp-bg-soft: rgba(255, 255, 255, 0.05);
+  --pp-text: #f6f2ec;
+  --pp-text-dim: #ada69c;
+  --pp-text-soft: #7d766e;
+  --pp-border: rgba(255, 255, 255, 0.1);
+  --pp-border-strong: rgba(255, 255, 255, 0.16);
+  --pp-shadow: 0 18px 42px rgba(0, 0, 0, 0.24);
+  --pp-shadow-soft: 0 10px 26px rgba(0, 0, 0, 0.16);
+  --pp-radius-outer: 18px;
+  --pp-radius-inner: 12px;
+  --pp-shell-pad: 6px;
+  --pp-button-size: 38px;
+  --pp-toolbar-size: calc(var(--pp-button-size) + (var(--pp-shell-pad) * 2) + 2px);
+  --pp-blur: blur(18px);
   position: fixed;
   top: 0;
   left: 0;
@@ -20,20 +27,35 @@
   pointer-events: none;
 }
 
+#pinpoint-root[data-theme="light"] {
+  --pp-accent: #e85102;
+  --pp-accent-soft: rgba(232, 81, 2, 0.12);
+  --pp-accent-border: rgba(232, 81, 2, 0.32);
+  --pp-bg: rgba(247, 242, 235, 0.8);
+  --pp-bg-strong: rgba(255, 251, 246, 0.9);
+  --pp-bg-soft: rgba(24, 18, 14, 0.04);
+  --pp-text: #1a1613;
+  --pp-text-dim: #72695f;
+  --pp-text-soft: #91867b;
+  --pp-border: rgba(24, 22, 20, 0.1);
+  --pp-border-strong: rgba(24, 22, 20, 0.16);
+  --pp-shadow: 0 16px 34px rgba(79, 57, 33, 0.12);
+  --pp-shadow-soft: 0 10px 24px rgba(79, 57, 33, 0.1);
+}
+
 #pinpoint-root *,
 #pinpoint-root *::before,
 #pinpoint-root *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Geist", "Segoe UI", sans-serif;
   line-height: 1.4;
   color: var(--pp-text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ── comment-mode cursor ─────────────────────────────── */
 html.pp-commenting,
 html.pp-commenting body,
 html.pp-commenting body * {
@@ -43,7 +65,8 @@ html.pp-commenting body * {
 #pinpoint-root .pp-bar-btn,
 #pinpoint-root .pp-toggle,
 #pinpoint-root .pp-pin,
-#pinpoint-root .pp-pop-btn {
+#pinpoint-root .pp-pop-btn,
+#pinpoint-root .pp-nav-btn {
   cursor: pointer !important;
 }
 
@@ -55,71 +78,100 @@ html.pp-commenting body * {
   cursor: text !important;
 }
 
-/* ── hidden helper ───────────────────────────────────── */
 #pinpoint-root .pp-hidden {
   display: none !important;
 }
 
-/* ── hover overlay ───────────────────────────────────── */
 #pinpoint-root .pp-overlay {
   position: fixed;
-  border: 2px solid var(--pp-accent);
-  border-radius: 4px;
-  background: rgba(212, 98, 14, 0.045);
+  border: 1px solid var(--pp-accent-border);
+  border-radius: 8px;
+  background: var(--pp-accent-soft);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
   pointer-events: none;
   z-index: 2147483641;
   opacity: 0;
-  transition: opacity 100ms, top 60ms, left 60ms, width 60ms, height 60ms;
+  transition-property: opacity, top, left, width, height;
+  transition-duration: 100ms, 70ms, 70ms, 70ms, 70ms;
 }
 
 #pinpoint-root .pp-overlay.pp-on {
   opacity: 1;
 }
 
-/* ── element-type tooltip ────────────────────────────── */
+#pinpoint-root .pp-highlight-layer,
+#pinpoint-root .pp-pin-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+#pinpoint-root .pp-highlight-layer {
+  z-index: 2147483642;
+}
+
+#pinpoint-root .pp-pin-layer {
+  z-index: 2147483643;
+}
+
+#pinpoint-root .pp-target-highlight {
+  position: fixed;
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+#pinpoint-root .pp-target-highlight {
+  background: rgba(232, 81, 2, 0.08);
+  border: 1px solid rgba(232, 81, 2, 0.26);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+#pinpoint-root .pp-target-highlight-text {
+  background: rgba(232, 81, 2, 0.14);
+}
+
+#pinpoint-root .pp-tip,
+#pinpoint-root .pp-bar-tip,
+#pinpoint-root .pp-toast,
+#pinpoint-root .pp-nav-pill,
+#pinpoint-root .pp-menu,
+#pinpoint-root .pp-popover,
+#pinpoint-root .pp-bar,
+#pinpoint-root .pp-toggle {
+  backdrop-filter: var(--pp-blur);
+  -webkit-backdrop-filter: var(--pp-blur);
+}
+
 #pinpoint-root .pp-tip {
   position: fixed;
-  background: linear-gradient(180deg, rgba(42, 42, 42, 0.96) 0%, rgba(30, 30, 30, 0.96) 100%);
+  background: var(--pp-bg-strong);
   border: 1px solid var(--pp-border);
   color: var(--pp-text-dim);
-  padding: 5px 12px;
-  border-radius: 9999px;
+  padding: 6px 12px;
+  border-radius: 12px;
   font-size: 11.5px;
   white-space: nowrap;
   max-width: 280px;
   overflow: hidden;
   text-overflow: ellipsis;
   pointer-events: none;
-  z-index: 2147483642;
+  z-index: 2147483644;
   opacity: 0;
-  transition: opacity 100ms;
-  box-shadow: var(--pp-shadow), inset 0 1px 0 rgba(255,255,255,0.05);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  transition: opacity 100ms ease;
+  box-shadow: var(--pp-shadow-soft);
 }
 
 #pinpoint-root .pp-tip.pp-on {
   opacity: 1;
 }
 
-/* ── pin layer ───────────────────────────────────────── */
-#pinpoint-root .pp-pin-layer {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 2147483643;
-}
-
-/* ── individual pin (#7 — scaled for multi-digit) ────── */
 #pinpoint-root .pp-pin {
   position: fixed;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: var(--pp-accent-gradient);
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  background: rgba(232, 81, 2, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   color: #fff;
   font-size: 11px;
   font-weight: 700;
@@ -127,323 +179,394 @@ html.pp-commenting body * {
   align-items: center;
   justify-content: center;
   pointer-events: auto;
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.2),
-    0 2px 6px rgba(212, 98, 14, 0.15),
-    inset 0 1px 0 rgba(255,255,255,0.15);
-  transition: transform 150ms ease, box-shadow 200ms cubic-bezier(0.23, 1, 0.32, 1), background 200ms cubic-bezier(0.23, 1, 0.32, 1);
+  box-shadow: 0 12px 20px rgba(232, 81, 2, 0.18);
+  transition-property: transform, background, border-color, box-shadow;
+  transition-duration: 160ms;
   user-select: none;
 }
 
 #pinpoint-root .pp-pin:hover {
-  transform: scale(1.1);
-  box-shadow:
-    0 2px 6px rgba(0, 0, 0, 0.25),
-    0 4px 10px rgba(212, 98, 14, 0.2),
-    inset 0 1px 0 rgba(255,255,255,0.15);
+  transform: translateY(-1px);
+  box-shadow: 0 16px 24px rgba(232, 81, 2, 0.22);
 }
 
-/* ── pin contrast: light backgrounds (elevation, no ring) */
-#pinpoint-root .pp-pin.pp-pin-light {
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.1),
-    0 4px 14px rgba(212, 98, 14, 0.18),
-    inset 0 1px 0 rgba(255,255,255,0.2);
-}
-
-#pinpoint-root .pp-pin.pp-pin-light:hover {
-  box-shadow:
-    0 2px 6px rgba(0, 0, 0, 0.12),
-    0 6px 20px rgba(212, 98, 14, 0.25),
-    inset 0 1px 0 rgba(255,255,255,0.2);
-}
-
-/* ── pin contrast: warm/orange backgrounds ──────────── */
+#pinpoint-root .pp-pin.pp-pin-light,
 #pinpoint-root .pp-pin.pp-pin-alt {
-  background: linear-gradient(180deg, #6366f1 0%, #4f46e5 100%);
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.2),
-    0 2px 6px rgba(79, 70, 229, 0.15),
-    inset 0 1px 0 rgba(255,255,255,0.15);
-}
-
-#pinpoint-root .pp-pin.pp-pin-alt:hover {
-  box-shadow:
-    0 2px 6px rgba(0, 0, 0, 0.25),
-    0 4px 10px rgba(79, 70, 229, 0.2),
-    inset 0 1px 0 rgba(255,255,255,0.15);
+  box-shadow: 0 12px 20px rgba(24, 22, 20, 0.16);
 }
 
 #pinpoint-root .pp-pin.pp-pin-sm {
-  font-size: 9px;
-  letter-spacing: -0.5px;
+  font-size: 10px;
 }
 
 #pinpoint-root .pp-pin.pp-pin-xs {
   width: 30px;
   height: 30px;
-  font-size: 8px;
-  letter-spacing: -0.5px;
+  font-size: 9px;
 }
 
-/* ── toolbar ─────────────────────────────────────────── */
+#pinpoint-root .pp-pin.pp-pin-orphaned {
+  background: rgba(96, 92, 87, 0.92);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.16);
+}
+
 #pinpoint-root .pp-bar {
   position: fixed;
-  bottom: 20px;
-  left: 20px;
   display: flex;
   align-items: center;
   gap: 2px;
-  background: linear-gradient(180deg, rgba(42, 42, 42, 0.92) 0%, rgba(34, 34, 34, 0.92) 100%);
+  padding: var(--pp-shell-pad);
   border: 1px solid var(--pp-border);
-  border-radius: 9999px;
-  padding: 5px;
+  border-radius: var(--pp-radius-outer);
+  background: var(--pp-bg);
   z-index: 2147483647;
-  box-shadow:
-    var(--pp-shadow),
-    inset 0 1px 0 rgba(255,255,255,0.05);
+  box-shadow: var(--pp-shadow);
   pointer-events: auto;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+}
+
+#pinpoint-root .pp-bar-btn,
+#pinpoint-root .pp-toggle,
+#pinpoint-root .pp-nav-btn,
+#pinpoint-root .pp-pop-btn {
+  border: 0;
+  border-radius: var(--pp-radius-inner);
+  background: transparent;
+  color: var(--pp-text-dim);
+  outline: none;
+  transition-property: transform, background, color, opacity, border-color, box-shadow;
+  transition-duration: 160ms;
 }
 
 #pinpoint-root .pp-bar-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  border: none;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--pp-text-dim);
-  transition: background 150ms, color 150ms, box-shadow 150ms,
-              filter 150ms, opacity 150ms;
-  pointer-events: auto;
+  width: var(--pp-button-size);
+  height: var(--pp-button-size);
   flex-shrink: 0;
-  outline: none;
 }
 
-#pinpoint-root .pp-bar-btn:hover {
-  background: var(--pp-bg-light);
+#pinpoint-root .pp-bar-btn:hover,
+#pinpoint-root .pp-nav-btn:hover,
+#pinpoint-root .pp-pop-delete:hover {
+  background: var(--pp-bg-soft);
   color: var(--pp-text);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
 }
 
-#pinpoint-root .pp-bar-btn.pp-active-btn {
-  background: var(--pp-accent-gradient);
+#pinpoint-root .pp-bar-btn:active,
+#pinpoint-root .pp-toggle:active,
+#pinpoint-root .pp-pop-btn:active,
+#pinpoint-root .pp-nav-btn:active {
+  transform: scale(0.96);
+}
+
+#pinpoint-root .pp-bar-btn.pp-active-btn,
+#pinpoint-root .pp-pop-submit.pp-submit-on {
+  background: var(--pp-accent);
   color: #fff;
-  box-shadow:
-    0 1px 4px rgba(212, 98, 14, 0.35),
-    inset 0 1px 0 rgba(255,255,255,0.15);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+#pinpoint-root .pp-bar-btn.pp-active-btn,
+#pinpoint-root .pp-pop-submit.pp-submit-on,
+#pinpoint-root .pp-comment-badge,
+#pinpoint-root .pp-toggle-badge,
+#pinpoint-root .pp-pin {
+  color: #fff;
+}
+
+#pinpoint-root .pp-bar-btn.pp-active-btn svg,
+#pinpoint-root .pp-pop-submit.pp-submit-on svg,
+#pinpoint-root .pp-comment-badge svg,
+#pinpoint-root .pp-toggle-badge svg,
+#pinpoint-root .pp-pin svg {
+  color: #fff;
+  fill: currentColor;
+  stroke: currentColor;
 }
 
 #pinpoint-root .pp-bar-btn.pp-btn-delete:hover {
-  background: #dc2626;
+  background: rgba(220, 38, 38, 0.14);
   color: #fff;
 }
 
-/* ── undo button state (#4) ──────────────────────────── */
 #pinpoint-root .pp-bar-btn.pp-undo-btn {
-  color: #4ade80;
+  color: #58d589;
 }
 
 #pinpoint-root .pp-bar-btn.pp-undo-btn:hover {
-  background: rgba(74, 222, 128, 0.12);
-  color: #4ade80;
+  background: rgba(88, 213, 137, 0.12);
 }
 
 #pinpoint-root .pp-bar-sep {
   width: 1px;
-  height: 20px;
+  height: 18px;
+  margin: 0 2px;
   background: var(--pp-border);
-  margin: 0 1px;
   flex-shrink: 0;
 }
 
-/* ── annotation count badge (#6) ─────────────────────── */
 #pinpoint-root .pp-count {
-  font-size: 11px;
-  font-weight: 600;
+  min-width: 18px;
+  padding: 0 4px;
+  border-radius: 10px;
   color: var(--pp-text);
-  padding: 0 2px;
-  min-width: 14px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: var(--pp-button-size);
   text-align: center;
-  line-height: 36px;
-  flex-shrink: 0;
   cursor: pointer;
-  border-radius: 6px;
-  transition: background 150ms;
+  font-variant-numeric: tabular-nums;
+  transition: background 160ms ease;
 }
 
 #pinpoint-root .pp-count:hover {
-  background: var(--pp-bg-light);
+  background: var(--pp-bg-soft);
 }
 
-/* ── toggle button (visible when bar hidden) ─────────── */
 #pinpoint-root .pp-toggle {
   position: fixed;
-  bottom: 20px;
-  left: 20px;
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
+  width: var(--pp-toolbar-size);
+  height: var(--pp-toolbar-size);
   border: 1px solid var(--pp-border);
-  background: linear-gradient(180deg, rgba(42, 42, 42, 0.92) 0%, rgba(34, 34, 34, 0.92) 100%);
-  color: var(--pp-text-dim);
+  border-radius: var(--pp-radius-outer);
+  background: var(--pp-bg);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 2147483647;
-  box-shadow:
-    var(--pp-shadow),
-    inset 0 1px 0 rgba(255,255,255,0.06);
-  transition: background 150ms, color 150ms, transform 150ms;
+  box-shadow: var(--pp-shadow);
   pointer-events: auto;
-  outline: none;
   overflow: visible;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
 }
 
 #pinpoint-root .pp-toggle:hover {
   color: var(--pp-accent);
-  transform: scale(1.06);
+  background: var(--pp-bg);
 }
 
-/* ── toggle badge ────────────────────────────────────── */
 #pinpoint-root .pp-toggle-badge {
   position: absolute;
-  top: -4px;
-  right: -4px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: 8px;
-  background: var(--pp-accent-gradient);
+  top: -5px;
+  right: -5px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--pp-accent);
   color: #fff;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
-  pointer-events: none;
-  box-shadow: 0 1px 4px rgba(212, 98, 14, 0.4);
-  line-height: 1;
+  box-shadow: 0 10px 16px rgba(232, 81, 2, 0.2);
+  font-variant-numeric: tabular-nums;
 }
 
 @keyframes pp-badge-pop {
-  0%   { transform: scale(0.5); }
-  70%  { transform: scale(1.15); }
+  0% { transform: scale(0.7); }
+  70% { transform: scale(1.1); }
   100% { transform: scale(1); }
 }
 
 #pinpoint-root .pp-toggle-badge.pp-badge-pop {
-  animation: pp-badge-pop 250ms cubic-bezier(0.25, 1, 0.5, 1);
+  animation: pp-badge-pop 240ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* ── popover (#15 — max-width, #16 — backdrop blur) ──── */
+#pinpoint-root .pp-popover,
+#pinpoint-root .pp-menu {
+  border: 1px solid var(--pp-border);
+  box-shadow: var(--pp-shadow);
+}
+
+#pinpoint-root .pp-menu {
+  background: var(--pp-bg);
+}
+
 #pinpoint-root .pp-popover {
   position: fixed;
-  width: 320px;
+  width: 332px;
   max-width: calc(100vw - 16px);
+  padding: 12px;
+  border-radius: var(--pp-radius-outer);
+  z-index: 2147483646;
+  pointer-events: auto;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  background: linear-gradient(180deg, rgba(42, 42, 42, 0.92) 0%, rgba(36, 36, 36, 0.92) 100%);
-  border: 1px solid var(--pp-border);
-  border-radius: 16px;
-  padding: 10px 10px 8px;
-  z-index: 2147483646;
-  box-shadow:
-    var(--pp-shadow),
-    inset 0 1px 0 rgba(255,255,255,0.05);
-  pointer-events: auto;
-  animation: pp-pop-in 120ms ease;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  gap: 8px;
+  animation: pp-pop-in 140ms cubic-bezier(0.22, 1, 0.36, 1);
+  background: var(--pp-bg-strong);
 }
 
 @keyframes pp-pop-in {
-  from { opacity: 0; transform: scale(0.95) translateY(4px); }
-  to   { opacity: 1; transform: scale(1) translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
-/* ── stacked comment cards ───────────────────────────── */
+#pinpoint-root .pp-pop-quote {
+  display: grid;
+  grid-template-columns: 3px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  padding: 10px 12px;
+  border: 1px solid rgba(232, 81, 2, 0.2);
+  border-radius: var(--pp-radius-inner);
+  background: rgba(232, 81, 2, 0.13);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+#pinpoint-root .pp-pop-quote.pp-pop-quote-single {
+  align-items: center;
+  min-height: 78px;
+}
+
+#pinpoint-root[data-theme="light"] .pp-pop-quote {
+  background: rgba(232, 81, 2, 0.09);
+  border-color: rgba(232, 81, 2, 0.18);
+}
+
+#pinpoint-root .pp-pop-quote-rail {
+  align-self: stretch;
+  min-height: 28px;
+  border-radius: 999px;
+  background: var(--pp-accent);
+}
+
+#pinpoint-root .pp-pop-quote.pp-pop-quote-single .pp-pop-quote-rail {
+  align-self: center;
+  height: 28px;
+}
+
+#pinpoint-root .pp-pop-quote-text {
+  min-width: 0;
+  color: var(--pp-text);
+  font-size: 13px;
+  line-height: 1.42;
+  letter-spacing: -0.01em;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+#pinpoint-root .pp-pop-quote-mark {
+  color: rgba(232, 81, 2, 0.84);
+  font-size: 20px;
+  line-height: 1;
+  padding-top: 1px;
+}
+
+#pinpoint-root .pp-pop-quote.pp-pop-quote-single .pp-pop-quote-mark {
+  align-self: center;
+  padding-top: 0;
+}
+
 #pinpoint-root .pp-comment-card {
-  padding: 8px 0;
+  padding: 8px 0 10px;
   border-bottom: 1px solid var(--pp-border);
 }
-
 
 #pinpoint-root .pp-comment-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 4px;
+  margin-bottom: 8px;
+}
+
+#pinpoint-root .pp-comment-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 #pinpoint-root .pp-comment-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 5px;
-  border-radius: 10px;
-  background: var(--pp-accent-gradient);
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: var(--pp-accent);
   color: #fff;
   font-size: 10px;
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
-#pinpoint-root .pp-comment-header .pp-pop-delete {
-  width: 26px;
-  height: 26px;
-  opacity: 0;
-  transition: opacity 150ms, background 150ms, color 150ms;
+#pinpoint-root .pp-input-shell {
+  border: 1px solid var(--pp-border);
+  border-radius: var(--pp-radius-inner);
+  background: rgba(255, 255, 255, 0.04);
+  padding: var(--pp-shell-pad);
+  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
 }
 
-#pinpoint-root .pp-comment-card:hover .pp-pop-delete {
-  opacity: 1;
+#pinpoint-root[data-theme="light"] .pp-input-shell {
+  background: rgba(24, 22, 20, 0.03);
 }
 
-#pinpoint-root .pp-comment-card .pp-pop-input {
-  color: var(--pp-text);
-  font-size: 13px;
+#pinpoint-root .pp-input-shell:focus-within {
+  border-color: var(--pp-accent-border);
+  box-shadow: inset 0 0 0 1px rgba(232, 81, 2, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+#pinpoint-root[data-theme="light"] .pp-input-shell:focus-within {
+  background: rgba(255, 255, 255, 0.7);
+}
+
+#pinpoint-root .pp-comment-card .pp-pop-copy,
+#pinpoint-root .pp-comment-card .pp-pop-delete {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
 }
 
 #pinpoint-root .pp-new-comment {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   padding-top: 2px;
 }
 
 #pinpoint-root .pp-comment-card + .pp-new-comment {
-  padding-top: 8px;
+  padding-top: 10px;
 }
 
 #pinpoint-root .pp-pop-input {
   width: 100%;
+  min-height: 70px;
+  border: 0;
   background: transparent;
-  border: none;
+  resize: vertical;
   outline: none;
-  font-size: 13.5px;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  color: var(--pp-text);
-  padding: 2px 0;
-  resize: none;
-  overflow-x: hidden;
-  overflow-y: auto;
-  max-height: 160px;
+  font-size: 15px;
   line-height: 1.5;
+  color: var(--pp-text);
+  padding: 6px 8px;
+}
+
+#pinpoint-root .pp-comment-card .pp-pop-input {
+  min-height: 54px;
+  font-size: 14px;
 }
 
 #pinpoint-root .pp-pop-input::placeholder {
-  color: #666;
+  color: var(--pp-text-soft);
 }
 
 #pinpoint-root .pp-pop-btns {
   display: flex;
-  align-items: center;
   justify-content: flex-end;
   gap: 6px;
 }
@@ -452,64 +575,37 @@ html.pp-commenting body * {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
-  border: none;
-  border-radius: 50%;
-  flex-shrink: 0;
-  transition: background 150ms, color 150ms, box-shadow 150ms, opacity 150ms;
-  outline: none;
+  width: 36px;
+  height: 36px;
 }
 
 #pinpoint-root .pp-pop-submit {
-  background: var(--pp-border);
-  color: #555;
+  background: rgba(255, 255, 255, 0.06);
 }
 
-#pinpoint-root .pp-pop-submit.pp-submit-on {
-  background: var(--pp-accent-gradient);
-  color: #fff;
-  box-shadow:
-    0 1px 4px rgba(212, 98, 14, 0.3),
-    inset 0 1px 0 rgba(255,255,255,0.15);
+#pinpoint-root .pp-pop-submit:not(.pp-submit-on) {
+  color: var(--pp-text-soft);
 }
 
-#pinpoint-root .pp-pop-submit.pp-submit-on:hover {
-  background: linear-gradient(180deg, var(--pp-accent) 0%, var(--pp-accent-hover) 100%);
-}
-
-#pinpoint-root .pp-pop-delete {
-  background: transparent;
-  color: var(--pp-text-dim);
-}
-
-#pinpoint-root .pp-pop-delete:hover {
-  background: #dc2626;
-  color: #fff;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
-}
-
-
-/* ── focus-visible (#14) ─────────────────────────────── */
 #pinpoint-root .pp-bar-btn:focus-visible,
 #pinpoint-root .pp-toggle:focus-visible,
 #pinpoint-root .pp-pin:focus-visible,
-#pinpoint-root .pp-pop-btn:focus-visible {
+#pinpoint-root .pp-pop-btn:focus-visible,
+#pinpoint-root .pp-nav-btn:focus-visible,
+#pinpoint-root .pp-switch-input:focus-visible + .pp-switch-track {
   outline: 2px solid var(--pp-accent);
   outline-offset: 2px;
 }
 
-/* ── icon flash transition ───────────────────────────── */
 #pinpoint-root .pp-flash-out {
   filter: blur(4px);
   opacity: 0;
 }
 
 #pinpoint-root .pp-flash-in {
-  color: #22c55e;
+  color: #58d589;
 }
 
-/* ── shake animation (#2 — empty state feedback) ─────── */
 @keyframes pp-shake {
   0%, 100% { transform: translateX(0); }
   20% { transform: translateX(-3px); }
@@ -522,25 +618,27 @@ html.pp-commenting body * {
   animation: pp-shake 300ms ease;
 }
 
-/* ── toolbar tooltip ─────────────────────────────────── */
-#pinpoint-root .pp-bar-tip {
+#pinpoint-root .pp-bar-tip,
+#pinpoint-root .pp-toast,
+#pinpoint-root .pp-nav-pill {
   position: fixed;
+  border: 1px solid var(--pp-border);
+  border-radius: 14px;
+  background: var(--pp-bg-strong);
+  box-shadow: var(--pp-shadow-soft);
+}
+
+#pinpoint-root .pp-bar-tip {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: linear-gradient(180deg, rgba(42, 42, 42, 0.96) 0%, rgba(30, 30, 30, 0.96) 100%);
-  border: 1px solid var(--pp-border);
-  padding: 6px 12px;
-  border-radius: 9999px;
+  padding: 8px 12px;
   white-space: nowrap;
   pointer-events: none;
   z-index: 2147483647;
   opacity: 0;
   transform: translateY(4px);
-  transition: opacity 120ms, transform 120ms;
-  box-shadow: var(--pp-shadow), inset 0 1px 0 rgba(255,255,255,0.05);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  transition: opacity 120ms ease, transform 120ms ease;
 }
 
 #pinpoint-root .pp-bar-tip.pp-on {
@@ -550,106 +648,121 @@ html.pp-commenting body * {
 
 #pinpoint-root .pp-bar-tip-label {
   font-size: 12px;
-  font-weight: 500;
-  color: var(--pp-text);
+  font-weight: 600;
 }
 
-#pinpoint-root .pp-bar-tip-keys {
+#pinpoint-root .pp-bar-tip-keys,
+#pinpoint-root .pp-sc-keys {
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
 }
 
-#pinpoint-root .pp-bar-tip .pp-key {
-  min-width: 22px;
-  height: 22px;
-  padding: 0 6px;
-  font-size: 11px;
+#pinpoint-root .pp-key {
+  min-width: 30px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 0;
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 0 0 1px var(--pp-border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pp-text);
+  line-height: 1;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
-/* ── menu panel ─────────────────────────────────────── */
+#pinpoint-root[data-theme="light"] .pp-key {
+  background: rgba(24, 22, 20, 0.03);
+}
+
 #pinpoint-root .pp-menu {
   position: fixed;
-  bottom: 76px;
-  left: 20px;
-  background: linear-gradient(180deg, rgba(42, 42, 42, 0.95) 0%, rgba(30, 30, 30, 0.95) 100%);
-  border: 1px solid var(--pp-border);
-  border-radius: 16px;
-  padding: 14px 16px;
-  z-index: 2147483647;
-  box-shadow:
-    var(--pp-shadow),
-    inset 0 1px 0 rgba(255,255,255,0.05);
-  pointer-events: auto;
-  animation: pp-pop-in 120ms ease;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  width: min(320px, calc(100vw - 24px));
   max-height: calc(100vh - 120px);
+  padding: 14px;
+  border-radius: var(--pp-radius-outer);
+  z-index: 2147483647;
+  pointer-events: auto;
   overflow-y: auto;
+  animation: pp-pop-in 140ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 #pinpoint-root .pp-menu-section {
-  padding: 2px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 #pinpoint-root .pp-menu-divider {
   height: 1px;
+  margin: 12px 0;
   background: var(--pp-border);
-  margin: 10px 0;
 }
 
-#pinpoint-root .pp-menu-row {
-  display: flex;
+#pinpoint-root .pp-menu-row,
+#pinpoint-root .pp-sc-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  padding: 6px 0;
   gap: 16px;
 }
 
-#pinpoint-root .pp-menu-label {
+#pinpoint-root .pp-menu-label,
+#pinpoint-root .pp-sc-label {
   font-size: 13px;
   color: var(--pp-text);
+  min-width: 0;
 }
 
-/* ── toggle switch ──────────────────────────────────── */
+#pinpoint-root .pp-sc-keys {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  max-width: 132px;
+}
+
 #pinpoint-root .pp-switch-label {
   position: relative;
-  display: inline-flex;
-  width: 36px;
-  height: 20px;
+  width: 38px;
+  height: 22px;
   flex-shrink: 0;
-  cursor: pointer;
 }
 
 #pinpoint-root .pp-switch-input {
-  opacity: 0;
-  width: 0;
-  height: 0;
   position: absolute;
+  inset: 0;
+  opacity: 0;
 }
 
 #pinpoint-root .pp-switch-track {
   position: absolute;
   inset: 0;
-  background: var(--pp-border);
-  border-radius: 10px;
-  transition: background 200ms cubic-bezier(0.25, 1, 0.5, 1);
+  border: 1px solid var(--pp-border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  transition: background 160ms ease, border-color 160ms ease;
 }
 
 #pinpoint-root .pp-switch-track::after {
-  content: '';
+  content: "";
   position: absolute;
-  width: 14px;
-  height: 14px;
-  left: 3px;
-  top: 3px;
-  background: #777;
-  border-radius: 50%;
-  transition: transform 200ms cubic-bezier(0.25, 1, 0.5, 1), background 200ms;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.74);
+  transition: transform 160ms ease, background 160ms ease;
 }
 
 #pinpoint-root .pp-switch-input:checked + .pp-switch-track {
-  background: var(--pp-accent);
+  background: rgba(232, 81, 2, 0.92);
+  border-color: transparent;
 }
 
 #pinpoint-root .pp-switch-input:checked + .pp-switch-track::after {
@@ -657,219 +770,116 @@ html.pp-commenting body * {
   background: #fff;
 }
 
-#pinpoint-root .pp-switch-input:focus-visible + .pp-switch-track {
-  outline: 2px solid var(--pp-accent);
-  outline-offset: 2px;
-}
-
-/* ── shortcuts section (reused styles) ──────────────── */
 #pinpoint-root .pp-sc-title {
-  font-size: 11px;
+  color: var(--pp-text-soft);
+  font-size: 12px;
   font-weight: 600;
-  color: var(--pp-text-dim);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 8px;
-}
-
-#pinpoint-root .pp-sc-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 4px 0;
-}
-
-#pinpoint-root .pp-sc-label {
-  font-size: 13px;
-  color: var(--pp-text);
-}
-
-#pinpoint-root .pp-sc-keys {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-}
-
-#pinpoint-root .pp-key {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 24px;
-  height: 24px;
-  padding: 0 6px;
-  background: var(--pp-bg);
-  border: 1px solid var(--pp-border);
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  color: var(--pp-text);
-  box-shadow: var(--pp-inset);
-  line-height: 1;
+  text-transform: none;
+  letter-spacing: -0.01em;
 }
 
 #pinpoint-root .pp-btn-shortcuts.pp-sc-open {
-  background: var(--pp-bg-light);
+  background: var(--pp-bg-soft);
   color: var(--pp-text);
 }
 
-/* ── toast notification ─────────────────────────────── */
 #pinpoint-root .pp-toast {
-  position: fixed;
-  bottom: 76px;
-  left: 20px;
-  background: linear-gradient(180deg, rgba(42, 42, 42, 0.96) 0%, rgba(30, 30, 30, 0.96) 100%);
-  border: 1px solid var(--pp-border);
-  border-radius: 9999px;
-  padding: 9px 16px;
+  padding: 10px 14px;
   font-size: 13px;
-  font-weight: 500;
-  color: var(--pp-text);
+  font-weight: 600;
   z-index: 2147483647;
   pointer-events: none;
-  box-shadow: var(--pp-shadow), inset 0 1px 0 rgba(255,255,255,0.05);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   white-space: nowrap;
 }
 
 @keyframes pp-toast-in {
   from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes pp-toast-out {
   from { opacity: 1; transform: translateY(0); }
-  to   { opacity: 0; transform: translateY(8px); }
+  to { opacity: 0; transform: translateY(8px); }
 }
 
 #pinpoint-root .pp-toast.pp-toast-in {
-  animation: pp-toast-in 220ms cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  animation: pp-toast-in 220ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 #pinpoint-root .pp-toast.pp-toast-out {
-  animation: pp-toast-out 280ms cubic-bezier(0.5, 0, 0.75, 0) forwards;
-}
-
-/* ── orphaned pins ───────────────────────────────────── */
-#pinpoint-root .pp-pin.pp-pin-orphaned {
-  background: linear-gradient(180deg, #555 0%, #444 100%);
-  opacity: 0.7;
-  width: 22px;
-  height: 22px;
-  font-size: 9px;
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.15),
-    inset 0 1px 0 rgba(255,255,255,0.08);
-}
-
-#pinpoint-root .pp-pin.pp-pin-orphaned:hover {
-  opacity: 0.9;
-  transform: scale(1.1);
+  animation: pp-toast-out 260ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
 #pinpoint-root .pp-orphan-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding-bottom: 8px;
+  padding-bottom: 10px;
   border-bottom: 1px solid var(--pp-border);
-  margin-bottom: 8px;
 }
 
 #pinpoint-root .pp-badge-orphan {
-  background: linear-gradient(180deg, #666 0%, #555 100%) !important;
+  background: rgba(96, 92, 87, 0.9) !important;
 }
 
 #pinpoint-root .pp-orphan-label {
-  font-size: 12px;
   color: var(--pp-text-dim);
+  font-size: 12px;
   flex: 1;
 }
 
-#pinpoint-root .pp-orphan-header .pp-pop-delete {
-  flex-shrink: 0;
-}
-
 #pinpoint-root .pp-orphan-comment {
-  font-size: 13px;
+  margin: 10px 0 8px;
   color: var(--pp-text);
-  margin-bottom: 8px;
+  font-size: 13px;
   line-height: 1.5;
 }
 
 #pinpoint-root .pp-orphan-selector {
-  font-size: 11px;
+  padding: 8px 10px;
+  border: 1px solid var(--pp-border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
   color: var(--pp-text-dim);
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
-  word-break: break-all;
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 6px;
-  padding: 6px 8px;
-  line-height: 1.4;
+  font-size: 11px;
+  font-family: "Geist Mono", "SF Mono", "JetBrains Mono", monospace;
+  word-break: break-word;
 }
 
-/* ── floating annotation navigator ───────────────────── */
 #pinpoint-root .pp-nav-pill {
-  position: fixed;
-  bottom: 76px;
-  left: 20px;
   display: flex;
   align-items: center;
-  gap: 2px;
-  background: linear-gradient(180deg, rgba(42, 42, 42, 0.96) 0%, rgba(30, 30, 30, 0.96) 100%);
-  border: 1px solid var(--pp-border);
-  border-radius: 9999px;
+  gap: 4px;
   padding: 4px;
+  background: var(--pp-bg);
   z-index: 2147483646;
-  box-shadow: var(--pp-shadow), inset 0 1px 0 rgba(255,255,255,0.05);
   pointer-events: auto;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
 }
 
 @keyframes pp-pill-in {
-  from { opacity: 0; transform: scale(0.9) translateY(6px); }
-  to   { opacity: 1; transform: scale(1) translateY(0); }
+  from { opacity: 0; transform: translateY(6px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 @keyframes pp-pill-out {
-  from { opacity: 1; transform: scale(1) translateY(0); }
-  to   { opacity: 0; transform: scale(0.9) translateY(6px); }
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(6px) scale(0.96); }
 }
 
 #pinpoint-root .pp-nav-pill.pp-pill-in {
-  animation: pp-pill-in 150ms cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  animation: pp-pill-in 150ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 #pinpoint-root .pp-nav-pill.pp-pill-out {
-  animation: pp-pill-out 200ms cubic-bezier(0.5, 0, 0.75, 0) forwards;
+  animation: pp-pill-out 180ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
 #pinpoint-root .pp-nav-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  border: none;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--pp-text-dim);
-  cursor: pointer;
-  transition: background 150ms, color 150ms;
-  outline: none;
-  flex-shrink: 0;
-}
-
-#pinpoint-root .pp-nav-btn:hover {
-  background: var(--pp-bg-light);
-  color: var(--pp-text);
-}
-
-#pinpoint-root .pp-nav-btn:focus-visible {
-  outline: 2px solid var(--pp-accent);
-  outline-offset: 2px;
+  width: 30px;
+  height: 30px;
 }
 
 #pinpoint-root .pp-nav-prev svg {
@@ -881,11 +891,12 @@ html.pp-commenting body * {
 }
 
 #pinpoint-root .pp-nav-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--pp-text);
-  min-width: 36px;
+  min-width: 38px;
+  padding: 0 4px;
   text-align: center;
-  user-select: none;
-  line-height: 28px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 30px;
+  color: var(--pp-text);
+  font-variant-numeric: tabular-nums;
 }

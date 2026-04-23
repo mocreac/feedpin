@@ -1,42 +1,84 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="popup.css">
 </head>
-<body>
+<body data-theme="dark">
   <div class="header">
-    <img src="icons/icon48.png" class="logo" alt="">
-    <span class="title">Agimut</span>
-  </div>
-  <div class="row">
-    <div>
-      <div class="label">Enabled</div>
-      <div class="site" id="site"></div>
+    <div class="brand">
+      <img src="icons/icon48.png" class="logo" alt="">
+      <div>
+        <span class="title">Agimut</span>
+      </div>
     </div>
-    <label class="switch">
-      <input type="checkbox" id="toggle" checked aria-label="Enable Agimut on this site">
-      <span class="slider"></span>
-    </label>
+    <div class="badge">v1.3</div>
   </div>
-  <div class="sep"></div>
-  <div class="row">
-    <div>
-      <div class="label">Dev only</div>
-      <div class="hint">localhost, 127.0.0.1, .local</div>
+  <div class="panel">
+    <div class="row">
+      <div>
+        <div class="label">Enabled</div>
+        <div class="site" id="site"></div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="toggle" checked aria-label="Enable Agimut on this site">
+        <span class="slider"></span>
+      </label>
     </div>
-    <label class="switch">
-      <input type="checkbox" id="devonly" aria-label="Dev environments only">
-      <span class="slider"></span>
-    </label>
+    <div class="sep"></div>
+    <div class="row">
+      <div>
+        <div class="label">Dev only</div>
+        <div class="hint">localhost, 127.0.0.1, .local</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="devonly" aria-label="Dev environments only">
+        <span class="slider"></span>
+      </label>
+    </div>
   </div>
-  <div class="sep"></div>
+  <div class="panel">
+    <div class="control-block">
+      <div class="setting-row">
+        <div>
+          <div class="label">Dark theme</div>
+          <div class="hint">Popup + overlay.</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="theme-toggle" checked aria-label="Use dark theme">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+    <div class="sep"></div>
+    <div class="control-block control-block-position">
+      <div class="position-layout">
+        <div class="position-copy">
+          <div class="label">Toolbar position</div>
+          <div class="hint">Pick a corner.</div>
+        </div>
+        <div class="position-picker" id="position-group" role="group" aria-label="Toolbar position" data-position="bottom-left">
+          <div class="position-board" aria-hidden="true">
+            <span class="position-dot position-dot-top-left"></span>
+            <span class="position-dot position-dot-top-right"></span>
+            <span class="position-dot position-dot-bottom-left"></span>
+            <span class="position-dot position-dot-bottom-right"></span>
+          </div>
+          <button type="button" class="position-zone position-zone-top-left" data-position-value="top-left" aria-label="Top left"></button>
+          <button type="button" class="position-zone position-zone-top-right" data-position-value="top-right" aria-label="Top right"></button>
+          <button type="button" class="position-zone position-zone-bottom-left" data-position-value="bottom-left" aria-label="Bottom left"></button>
+          <button type="button" class="position-zone position-zone-bottom-right" data-position-value="bottom-right" aria-label="Bottom right"></button>
+        </div>
+      </div>
+    </div>
+  </div>
   <div class="links">
-    <a class="link" id="privacy" href="https://mocreac.com/privacy-policy" target="_blank">Privacy Policy <span class="link-arrow">&#x2197;</span></a>
-    <a class="link" href="https://github.com/mocreac/agimut" target="_blank">Source <span class="link-arrow">&#x2197;</span></a>
+    <button type="button" class="link" data-url="https://mocreac.com/privacy-policy">Privacy Policy <span class="link-arrow">&#x2197;</span></button>
+    <button type="button" class="link" data-url="https://github.com/mocreac/agimut">Source <span class="link-arrow">&#x2197;</span></button>
   </div>
   <div class="footer">
-    <span class="made-by">Made by <a href="https://mocreac.com" target="_blank">George Mocreac</a></span>
-    <span class="version">v1.1</span>
+    <span class="made-by">Made by <button type="button" class="made-by-link" data-url="https://mocreac.com">George Mocreac</button></span>
   </div>
   <script src="popup.js"></script>
 </body>

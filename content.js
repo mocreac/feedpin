@@ -11,6 +11,13 @@
   var popoverTarget = null;
   var editingAnn = null;
   var morphTimer = null;
+  var uiTheme = 'dark';
+  var toolbarPosition = 'bottom-left';
+
+  /* ── transient selection state ─────────────────────────── */
+  var highlightNodes = [];
+  var selectionPointerDown = false;
+  var suppressClickOnce = false;
 
   /* ── undo state ────────────────────────────────────────── */
   var undoData = null;   // { items: [...], nextId }
@@ -30,7 +37,11 @@
   var navElemsDirty = true;
 
   /* ── persistence key ───────────────────────────────────── */
-  var STORE_KEY = 'pinpoint:' + location.origin + location.pathname + location.search + location.hash;
+  function getStoreKey() {
+    return 'pinpoint:' + location.origin + location.pathname + location.search;
+  }
+
+  var STORE_KEY = getStoreKey();
 
   /* ── friendly tag names ────────────────────────────────── */
   var TAG = {
@@ -90,6 +101,10 @@
   overlay.className = 'pp-overlay';
   overlay.setAttribute('aria-hidden', 'true');
   root.appendChild(overlay);
+
+  var highlightLayer = document.createElement('div');
+  highlightLayer.className = 'pp-highlight-layer';
+  root.appendChild(highlightLayer);
 
   var tip = document.createElement('div');
   tip.className = 'pp-tip';
@@ -199,6 +214,64 @@
   var btnShortcuts  = bar.querySelector('.pp-btn-shortcuts');
   var countEl       = bar.querySelector('.pp-count');
 
+  function applyTheme(theme) {
+    uiTheme = theme === 'light' ? 'light' : 'dark';
+    root.setAttribute('data-theme', uiTheme);
+  }
+
+  function normalizeToolbarPosition(position) {
+    if (position === 'top-left' || position === 'top-right' ||
+        position === 'bottom-left' || position === 'bottom-right') {
+      return position;
+    }
+    if (position === 'top-center') return 'top-left';
+    if (position === 'bottom-center') return 'bottom-left';
+    return 'bottom-left';
+  }
+
+  function applyToolbarPosition(position) {
+    var pos = normalizeToolbarPosition(position);
+    var isTop = pos.indexOf('top-') === 0;
+    var isRight = pos.indexOf('-right') !== -1;
+
+    toolbarPosition = pos;
+
+    [bar, toggle, menuPanel, toast, navPill].forEach(function (el) {
+      el.style.top = '';
+      el.style.bottom = '';
+      el.style.left = '';
+      el.style.right = '';
+      el.style.transform = '';
+    });
+
+    var mainOffset = isTop ? '20px' : '20px';
+    var stackOffset = isTop ? '76px' : '76px';
+
+    if (isTop) {
+      bar.style.top = mainOffset;
+      toggle.style.top = mainOffset;
+      menuPanel.style.top = stackOffset;
+      toast.style.top = stackOffset;
+      navPill.style.top = stackOffset;
+    } else {
+      bar.style.bottom = mainOffset;
+      toggle.style.bottom = mainOffset;
+      menuPanel.style.bottom = stackOffset;
+      toast.style.bottom = stackOffset;
+      navPill.style.bottom = stackOffset;
+    }
+
+    if (isRight) {
+      [bar, toggle, menuPanel, toast, navPill].forEach(function (el) {
+        el.style.right = '20px';
+      });
+    } else {
+      [bar, toggle, menuPanel, toast, navPill].forEach(function (el) {
+        el.style.left = '20px';
+      });
+    }
+  }
+
   /* ── activate / deactivate ─────────────────────────────── */
   function activate() {
     active = true;
@@ -213,10 +286,12 @@
     bar.style.overflow = '';
     bar.classList.remove('pp-hidden');
     var fullWidth = bar.offsetWidth;
+    var collapsedSize = bar.offsetHeight;
+    var collapsedRadius = window.getComputedStyle(toggle).borderRadius || '18px';
 
     // Collapse to toggle size
-    bar.style.width = '46px';
-    bar.style.borderRadius = '50%';
+    bar.style.width = collapsedSize + 'px';
+    bar.style.borderRadius = collapsedRadius;
     bar.style.overflow = 'hidden';
     void bar.offsetWidth;
     bar.style.visibility = '';
@@ -243,10 +318,13 @@
     active = false;
     stopCommenting();
     hidePopover();
+    hideTargetHighlight();
     hideOverlay();
     hideMenu();
     hideBarTip();
     clearUndoState();
+    clearBrowserSelection();
+    selectionPointerDown = false;
 
     // Cancel all pending flash animations
     flashTimers.forEach(function (timers, btn) {
@@ -270,13 +348,15 @@
 
     // Capture width, collapse to toggle size
     var curWidth = bar.offsetWidth;
+    var collapsedSize = bar.offsetHeight;
+    var collapsedRadius = window.getComputedStyle(toggle).borderRadius || '18px';
     bar.style.width = curWidth + 'px';
     bar.style.overflow = 'hidden';
     void bar.offsetWidth;
 
     bar.style.transition = 'width 250ms cubic-bezier(0.5, 0, 0.75, 0), border-radius 250ms cubic-bezier(0.5, 0, 0.75, 0)';
-    bar.style.width = '46px';
-    bar.style.borderRadius = '50%';
+    bar.style.width = collapsedSize + 'px';
+    bar.style.borderRadius = collapsedRadius;
 
     morphTimer = setTimeout(function () {
       bar.style.transition = '';
@@ -326,8 +406,13 @@
   function showToast(message) {
     clearTimeout(toastTimer);
     toast.textContent = message;
-    // Sit above nav pill when it's visible, otherwise take its spot
-    toast.style.bottom = navPillActive ? '116px' : '';
+    toast.style.top = '';
+    toast.style.bottom = '';
+    if (toolbarPosition.indexOf('top-') === 0) {
+      toast.style.top = navPillActive ? '116px' : '76px';
+    } else {
+      toast.style.bottom = navPillActive ? '116px' : '76px';
+    }
     toast.classList.remove('pp-hidden', 'pp-toast-out');
     void toast.offsetWidth;
     toast.classList.add('pp-toast-in');
@@ -337,7 +422,9 @@
       toastTimer = setTimeout(function () {
         toast.classList.add('pp-hidden');
         toast.classList.remove('pp-toast-out');
+        toast.style.top = '';
         toast.style.bottom = '';
+        applyToolbarPosition(toolbarPosition);
       }, 300);
     }, 2500);
   }
@@ -384,12 +471,333 @@
     hovered = null;
   }
 
-  /* ── popover ───────────────────────────────────────────── */
-  function getAnnotationsForElement(el) {
-    return annotations.filter(function (a) { return a.el === el; });
+  function clampRect(rect) {
+    var left = Math.max(0, rect.left);
+    var top = Math.max(0, rect.top);
+    var right = Math.min(window.innerWidth, rect.right);
+    var bottom = Math.min(window.innerHeight, rect.bottom);
+    return {
+      left: left,
+      top: top,
+      right: right,
+      bottom: bottom,
+      width: Math.max(0, right - left),
+      height: Math.max(0, bottom - top),
+    };
   }
 
-  function buildCommentCard(ann, pop) {
+  function clearHighlights() {
+    highlightNodes.forEach(function (node) { node.remove(); });
+    highlightNodes = [];
+  }
+
+  function showHighlightRects(rects, className) {
+    clearHighlights();
+    rects.forEach(function (rect) {
+      if (!rect || rect.width < 1 || rect.height < 1) return;
+      var node = document.createElement('div');
+      node.className = 'pp-target-highlight' + (className ? ' ' + className : '');
+      node.style.top = rect.top + 'px';
+      node.style.left = rect.left + 'px';
+      node.style.width = rect.width + 'px';
+      node.style.height = rect.height + 'px';
+      highlightLayer.appendChild(node);
+      highlightNodes.push(node);
+    });
+  }
+
+  function getVisibleElementRects(elements) {
+    var rects = [];
+    elements.forEach(function (element) {
+      if (!element || !element.isConnected) return;
+      var rect = clampRect(element.getBoundingClientRect());
+      if (rect.width > 0 && rect.height > 0) rects.push(rect);
+    });
+    return rects;
+  }
+
+  function getRangeRects(range) {
+    if (!range) return [];
+    return Array.from(range.getClientRects()).map(clampRect).filter(function (rect) {
+      return rect.width > 0 && rect.height > 0;
+    });
+  }
+
+  function getUnionRect(rects) {
+    if (!rects.length) return null;
+    var left = rects[0].left;
+    var top = rects[0].top;
+    var right = rects[0].right;
+    var bottom = rects[0].bottom;
+
+    for (var i = 1; i < rects.length; i++) {
+      left = Math.min(left, rects[i].left);
+      top = Math.min(top, rects[i].top);
+      right = Math.max(right, rects[i].right);
+      bottom = Math.max(bottom, rects[i].bottom);
+    }
+
+    return {
+      left: left,
+      top: top,
+      right: right,
+      bottom: bottom,
+      width: right - left,
+      height: bottom - top,
+    };
+  }
+
+  function normalizeQuote(text) {
+    return (text || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function getRangeOffsets(container, range) {
+    if (!container || !range) return null;
+    try {
+      var startRange = document.createRange();
+      startRange.selectNodeContents(container);
+      startRange.setEnd(range.startContainer, range.startOffset);
+
+      var endRange = document.createRange();
+      endRange.selectNodeContents(container);
+      endRange.setEnd(range.endContainer, range.endOffset);
+
+      return {
+        start: startRange.toString().length,
+        end: endRange.toString().length,
+      };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function restoreRangeFromOffsets(container, start, end, quote) {
+    if (!container) return null;
+
+    var textContent = container.textContent || '';
+    if (quote && (!textContent || end > textContent.length)) {
+      var idx = textContent.indexOf(quote);
+      if (idx !== -1) {
+        start = idx;
+        end = idx + quote.length;
+      }
+    }
+
+    if (start < 0 || end <= start) return null;
+
+    var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
+    var currentIndex = 0;
+    var startNode = null;
+    var endNode = null;
+    var startOffset = 0;
+    var endOffset = 0;
+
+    while (walker.nextNode()) {
+      var node = walker.currentNode;
+      var nextIndex = currentIndex + node.nodeValue.length;
+      if (!startNode && start >= currentIndex && start <= nextIndex) {
+        startNode = node;
+        startOffset = start - currentIndex;
+      }
+      if (!endNode && end >= currentIndex && end <= nextIndex) {
+        endNode = node;
+        endOffset = end - currentIndex;
+        break;
+      }
+      currentIndex = nextIndex;
+    }
+
+    if (!startNode || !endNode) return null;
+
+    var range = document.createRange();
+    range.setStart(startNode, startOffset);
+    range.setEnd(endNode, endOffset);
+    return range;
+  }
+
+  function getTargetKey(target) {
+    if (!target) return '';
+    if (target.kind === 'text') {
+      return 'text:' + target.selector + ':' + target.textStart + ':' + target.textEnd;
+    }
+    return 'element:' + target.selector;
+  }
+
+  function getTargetDescription(target) {
+    if (!target) return '';
+    if (target.kind === 'text') return target.quote || 'Selected text';
+    return target.selector;
+  }
+
+  function getTargetRects(target) {
+    if (!target) return [];
+    if (target.kind === 'text') {
+      var rangeRects = getRangeRects(target.range);
+      if (rangeRects.length) return rangeRects;
+      return getVisibleElementRects(target.el ? [target.el] : []);
+    }
+    return getVisibleElementRects(target.el ? [target.el] : []);
+  }
+
+  function getTargetAnchorRect(target) {
+    return getUnionRect(getTargetRects(target));
+  }
+
+  function showTargetHighlight(target) {
+    if (!target) return;
+    if (target.kind === 'element') {
+      clearHighlights();
+      showOverlay(target.el);
+      return;
+    }
+    hideOverlay();
+    showHighlightRects(getTargetRects(target), 'pp-target-highlight-text');
+  }
+
+  function hideTargetHighlight() {
+    clearHighlights();
+  }
+
+  function getSelectionContainer(range) {
+    if (!range) return null;
+    var node = range.commonAncestorContainer;
+    if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
+    while (node && !isSkippable(node)) {
+      var rect = node.getBoundingClientRect();
+      if (rect.width > 8 && rect.height > 8) return node;
+      node = node.parentElement;
+    }
+    return null;
+  }
+
+  function getTextSelectionTarget() {
+    var selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return null;
+    var range = selection.getRangeAt(0);
+    var quote = normalizeQuote(selection.toString());
+    if (!quote || root.contains(range.commonAncestorContainer)) return null;
+
+    var container = getSelectionContainer(range);
+    if (!container) return null;
+
+    var offsets = getRangeOffsets(container, range);
+    if (!offsets || offsets.end <= offsets.start) return null;
+
+    return {
+      kind: 'text',
+      el: container,
+      selector: buildSelector(container),
+      type: 'text',
+      quote: quote,
+      textStart: offsets.start,
+      textEnd: offsets.end,
+      range: range.cloneRange(),
+      key: '',
+    };
+  }
+
+  function clearBrowserSelection() {
+    var selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) selection.removeAllRanges();
+  }
+
+  function makeElementTarget(el) {
+    return {
+      kind: 'element',
+      el: el,
+      selector: buildSelector(el),
+      type: typeName(el),
+      key: '',
+    };
+  }
+
+  function prepareTarget(target) {
+    if (!target) return null;
+    target.key = getTargetKey(target);
+    return target;
+  }
+
+  function getAnnotationsForTarget(target) {
+    var key = target ? target.key || getTargetKey(target) : '';
+    return annotations.filter(function (ann) { return ann.key === key; });
+  }
+
+  function getTargetFromAnnotation(ann) {
+    if (!ann || ann.orphaned) return null;
+    if (ann.kind === 'text') {
+      var range = ann.range || restoreRangeFromOffsets(ann.el, ann.textStart, ann.textEnd, ann.quote);
+      if (!range) {
+        markAnnotationOrphaned(ann);
+        return null;
+      }
+      ann.range = range;
+      return prepareTarget({
+        kind: 'text',
+        el: ann.el,
+        selector: ann.selector,
+        type: 'text',
+        quote: ann.quote,
+        textStart: ann.textStart,
+        textEnd: ann.textEnd,
+        range: range,
+      });
+    }
+    return prepareTarget({
+      kind: 'element',
+      el: ann.el,
+      selector: ann.selector,
+      type: ann.type,
+    });
+  }
+
+  function scrollAnnotationIntoView(ann, done) {
+    if (!ann) {
+      if (done) done(false);
+      return;
+    }
+    var targetEl = ann.el;
+    if (!targetEl || !targetEl.isConnected) {
+      if (done) done(false);
+      return;
+    }
+
+    targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    var settled = 0;
+    var lastY = targetEl.getBoundingClientRect().top;
+    var frameCount = 0;
+
+    function finish(success) {
+      if (!done) return;
+      var cb = done;
+      done = null;
+      cb(success);
+    }
+
+    function waitForScroll() {
+      frameCount++;
+      if (!targetEl.isConnected || frameCount > 60) {
+        finish(false);
+        return;
+      }
+      var curY = targetEl.getBoundingClientRect().top;
+      if (Math.abs(curY - lastY) < 1) {
+        settled++;
+        if (settled >= 3) {
+          finish(true);
+          return;
+        }
+      } else {
+        settled = 0;
+      }
+      lastY = curY;
+      requestAnimationFrame(waitForScroll);
+    }
+
+    requestAnimationFrame(waitForScroll);
+  }
+
+  /* ── popover ───────────────────────────────────────────── */
+  function buildCommentCard(ann) {
     var card = document.createElement('div');
     card.className = 'pp-comment-card';
 
@@ -400,6 +808,26 @@
     badge.textContent = ann.id;
     header.appendChild(badge);
 
+    var actions = document.createElement('div');
+    actions.className = 'pp-comment-actions';
+
+    var copy = document.createElement('button');
+    copy.className = 'pp-pop-btn pp-pop-copy';
+    copy.title = 'Copy annotation';
+    copy.setAttribute('aria-label', 'Copy annotation');
+    copy.innerHTML = ico.copy;
+    copy.addEventListener('click', function (e) {
+      e.stopPropagation();
+      navigator.clipboard.writeText(formatMarkdown([ann])).then(
+        function () {
+          flashBtn(copy, ico.copy);
+          showToast('Annotation ' + ann.id + ' copied');
+        },
+        function () { shakeBtn(copy); }
+      );
+    });
+    actions.appendChild(copy);
+
     var del = document.createElement('button');
     del.className = 'pp-pop-btn pp-pop-delete';
     del.title = 'Delete';
@@ -407,27 +835,30 @@
     del.innerHTML = ico.trashSm;
     del.addEventListener('click', function (e) {
       e.stopPropagation();
-      var targetEl = ann.el;
       deleteAnnotation(ann.id);
-      // Reopen popover to refresh all badges, or close if none left
-      var remaining = getAnnotationsForElement(targetEl);
+      var remaining = annotations.filter(function (item) { return item.key === ann.key; });
       if (remaining.length > 0) {
-        showPopover(targetEl, remaining[0]);
-        showOverlay(targetEl);
+        navPillTo(remaining[0]);
       } else {
         hidePopover();
+        hideTargetHighlight();
         hideOverlay();
       }
     });
-    header.appendChild(del);
+    actions.appendChild(del);
+    header.appendChild(actions);
     card.appendChild(header);
+
+    var shell = document.createElement('div');
+    shell.className = 'pp-input-shell';
 
     var input = document.createElement('textarea');
     input.className = 'pp-pop-input';
     input.value = ann.comment;
     input.rows = 1;
     input.setAttribute('aria-label', 'Annotation ' + ann.id);
-    card.appendChild(input);
+    shell.appendChild(input);
+    card.appendChild(shell);
 
     function autoGrow() {
       input.style.height = 'auto';
@@ -435,11 +866,11 @@
     }
     input.addEventListener('input', function () {
       autoGrow();
-      ann.comment = input.value.trim();
+      ann.comment = input.value;
       persist();
     });
     input.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); hidePopover(); hideOverlay(); }
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); hidePopover(); hideTargetHighlight(); hideOverlay(); }
       e.stopPropagation();
     });
     requestAnimationFrame(autoGrow);
@@ -447,35 +878,63 @@
     return card;
   }
 
-  function showPopover(el, ann) {
+  function showPopover(target, ann) {
     hidePopover();
+    target = prepareTarget(target);
     editingAnn = ann || null;
-    popoverTarget = el;
+    popoverTarget = target;
 
-    // Find all annotations on this element
-    var elAnns = ann ? getAnnotationsForElement(el) : [];
-    var isEdit = elAnns.length > 0;
+    var targetAnns = ann ? getAnnotationsForTarget(target) : [];
+    var isEdit = targetAnns.length > 0;
+    var quoteTextNode = null;
+    var quoteBlockNode = null;
 
     var pop = document.createElement('div');
     pop.className = 'pp-popover';
 
-    // Show existing annotation cards
     if (isEdit) {
-      elAnns.forEach(function (a) {
-        pop.appendChild(buildCommentCard(a, pop));
+      targetAnns.forEach(function (a) {
+        pop.appendChild(buildCommentCard(a));
       });
     }
 
-    // New comment input (always shown)
     var newSection = document.createElement('div');
     newSection.className = 'pp-new-comment';
 
+    if (target.kind === 'text') {
+      var quote = document.createElement('div');
+      quote.className = 'pp-pop-quote';
+      quote.title = getTargetDescription(target);
+
+      var quoteRail = document.createElement('div');
+      quoteRail.className = 'pp-pop-quote-rail';
+      quote.appendChild(quoteRail);
+
+      var quoteText = document.createElement('div');
+      quoteText.className = 'pp-pop-quote-text';
+      quoteText.textContent = getTargetDescription(target);
+      quote.appendChild(quoteText);
+      quoteTextNode = quoteText;
+      quoteBlockNode = quote;
+
+      var quoteMark = document.createElement('div');
+      quoteMark.className = 'pp-pop-quote-mark';
+      quoteMark.innerHTML = '&rdquo;';
+      quote.appendChild(quoteMark);
+
+      newSection.appendChild(quote);
+    }
+
+    var shell = document.createElement('div');
+    shell.className = 'pp-input-shell pp-input-shell-new';
+
     var input = document.createElement('textarea');
     input.className = 'pp-pop-input';
-    input.placeholder = isEdit ? 'Add another comment' : 'Add a comment';
+    input.placeholder = isEdit ? 'Add another note' : 'Describe what should change';
     input.setAttribute('aria-label', 'New comment');
     input.rows = 1;
-    newSection.appendChild(input);
+    shell.appendChild(input);
+    newSection.appendChild(shell);
 
     function autoGrow() {
       input.style.height = 'auto';
@@ -509,7 +968,7 @@
 
     input.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commit(); }
-      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); hidePopover(); hideOverlay(); }
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); hidePopover(); hideTargetHighlight(); hideOverlay(); }
       e.stopPropagation();
     });
 
@@ -518,15 +977,23 @@
     function commit() {
       var text = input.value.trim();
       if (!text) return;
-      addAnnotation(el, text);
+      addAnnotation(target, text);
       hidePopover();
+      hideTargetHighlight();
       hideOverlay();
     }
 
     root.appendChild(pop);
     popover = pop;
-    positionPop(el, pop);
-    requestAnimationFrame(function () { input.focus(); });
+    positionPop(target, pop);
+    requestAnimationFrame(function () {
+      if (quoteTextNode && quoteBlockNode) {
+        var lineHeight = parseFloat(getComputedStyle(quoteTextNode).lineHeight) || 18;
+        var isSingleLine = quoteTextNode.scrollHeight <= lineHeight * 1.5;
+        quoteBlockNode.classList.toggle('pp-pop-quote-single', isSingleLine);
+      }
+      input.focus();
+    });
     if (ann) showNavPill(ann);
   }
 
@@ -640,72 +1107,65 @@
       return;
     }
 
-    if (!ann.el || !ann.el.isConnected) return;
+    var target = getTargetFromAnnotation(ann);
+    if (!target) return;
 
-    var r = ann.el.getBoundingClientRect();
-    var inView = r.top >= 0 && r.bottom <= window.innerHeight;
+    var r = getTargetAnchorRect(target);
+    var inView = r && r.bottom > 0 && r.top < window.innerHeight;
     if (inView) {
-      showOverlay(ann.el);
-      showPopover(ann.el, ann);
+      showTargetHighlight(target);
+      showPopover(target, ann);
     } else {
-      ann.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      var settled = 0;
-      var lastY = ann.el.getBoundingClientRect().top;
-      var frameCount = 0;
-      function waitNav() {
-        frameCount++;
-        if (!ann.el.isConnected || frameCount > 60) return;
-        var curY = ann.el.getBoundingClientRect().top;
-        if (Math.abs(curY - lastY) < 1) {
-          settled++;
-          if (settled >= 3) {
-            showOverlay(ann.el);
-            showPopover(ann.el, ann);
-            return;
-          }
-        } else {
-          settled = 0;
+      scrollAnnotationIntoView(ann, function () {
+        var liveTarget = getTargetFromAnnotation(ann);
+        if (!liveTarget) {
+          if (ann.orphaned) showOrphanPopover(ann);
+          return;
         }
-        lastY = curY;
-        requestAnimationFrame(waitNav);
-      }
-      requestAnimationFrame(waitNav);
+        showTargetHighlight(liveTarget);
+        showPopover(liveTarget, ann);
+      });
     }
   }
 
-  function positionPop(el, pop) {
-    var r = el.getBoundingClientRect();
-    var vh = window.innerHeight;
-    var visTop = Math.max(0, r.top);
-    var visBottom = Math.min(vh, r.bottom);
-    var above = visBottom > vh * 0.6;
+  function positionPop(target, pop) {
+    var anchor = getTargetAnchorRect(target);
+    if (!anchor) return;
 
-    if (above) {
-      var bottomVal = vh - visTop + 10;
-      if (bottomVal > vh - 8) {
-        pop.style.top = '8px';
-        pop.style.bottom = 'auto';
-      } else {
-        pop.style.bottom = bottomVal + 'px';
-        pop.style.top = 'auto';
-      }
+    var popWidth = pop.offsetWidth || 320;
+    var popHeight = pop.offsetHeight || 180;
+    var spaceAbove = anchor.top - 8;
+    var spaceBelow = window.innerHeight - anchor.bottom - 8;
+    var top;
+
+    if (spaceBelow >= popHeight + 12 || spaceBelow >= spaceAbove) {
+      top = Math.min(anchor.bottom + 12, window.innerHeight - popHeight - 8);
     } else {
-      pop.style.top = Math.min(visBottom + 10, vh - 80) + 'px';
-      pop.style.bottom = 'auto';
+      top = Math.max(8, anchor.top - popHeight - 12);
     }
 
-    var left = r.left + r.width / 2 - 160;
-    left = Math.max(8, Math.min(left, window.innerWidth - 328));
+    var left = anchor.left + anchor.width / 2 - popWidth / 2;
+    left = Math.max(8, Math.min(left, window.innerWidth - popWidth - 8));
+
+    pop.style.top = top + 'px';
     pop.style.left = left + 'px';
+    pop.style.bottom = 'auto';
   }
 
   /* ── annotations & pins ────────────────────────────────── */
-  function addAnnotation(el, comment) {
+  function addAnnotation(target, comment) {
+    target = prepareTarget(target);
     var ann = {
       id: nextId++,
-      el: el,
-      selector: buildSelector(el),
-      type: typeName(el),
+      key: target.key,
+      kind: target.kind,
+      el: target.el || null,
+      range: target.kind === 'text' ? target.range : null,
+      selector: target.selector,
+      type: target.kind === 'element' ? target.type : 'text',
+      quote: target.quote || '',
+      textStart: target.kind === 'text' ? target.textStart : null,
+      textEnd: target.kind === 'text' ? target.textEnd : null,
       comment: comment,
       pinEl: null,
     };
@@ -754,6 +1214,7 @@
     if (annotations.length === 0) { shakeBtn(btnDelete); return; }
     var count = annotations.length;
     hidePopover();
+    hideTargetHighlight();
     hideOverlay();
     saveUndoState();
     annotations.forEach(function (a) { if (a.pinEl) a.pinEl.remove(); });
@@ -762,6 +1223,23 @@
     persist();
     updateCount();
     showToast(count + ' annotation' + (count !== 1 ? 's' : '') + ' deleted');
+  }
+
+  function syncOrphanPinState(ann) {
+    if (!ann || !ann.pinEl) return;
+    ann.pinEl.classList.toggle('pp-pin-orphaned', !!ann.orphaned);
+    ann.pinEl.title = ann.orphaned ? 'Element not found' : '';
+    if (!ann.orphaned) adaptPinTheme(ann);
+  }
+
+  function markAnnotationOrphaned(ann) {
+    if (!ann || ann.orphaned) return;
+    ann.orphaned = true;
+    ann.el = null;
+    ann.range = null;
+    syncOrphanPinState(ann);
+    positionPin(ann);
+    persist();
   }
 
   function createPin(ann) {
@@ -774,18 +1252,10 @@
     else if (ann.id >= 10) pin.classList.add('pp-pin-sm');
     pin.textContent = ann.id;
 
-    if (ann.orphaned) {
-      pin.classList.add('pp-pin-orphaned');
-      pin.title = 'Element not found';
-    }
-
     pinLayer.appendChild(pin);
     ann.pinEl = pin;
+    syncOrphanPinState(ann);
     positionPin(ann);
-
-    if (!ann.orphaned) {
-      adaptPinTheme(ann);
-    }
 
     pin.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' || e.key === ' ') {
@@ -802,37 +1272,25 @@
         return;
       }
 
-      if (!ann.el.isConnected) return;
+      var target = getTargetFromAnnotation(ann);
+      if (!target) return;
 
-      var r = ann.el.getBoundingClientRect();
-      var inView = r.top >= 0 && r.bottom <= window.innerHeight;
+      var r = getTargetAnchorRect(target);
+      var inView = r && r.bottom > 0 && r.top < window.innerHeight;
 
       if (inView) {
-        showOverlay(ann.el);
-        showPopover(ann.el, ann);
+        showTargetHighlight(target);
+        showPopover(target, ann);
       } else {
-        ann.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        var settled = 0;
-        var lastY = ann.el.getBoundingClientRect().top;
-        var frameCount = 0;
-        function waitForScroll() {
-          frameCount++;
-          if (!ann.el.isConnected || frameCount > 60) return;
-          var curY = ann.el.getBoundingClientRect().top;
-          if (Math.abs(curY - lastY) < 1) {
-            settled++;
-            if (settled >= 3) {
-              showOverlay(ann.el);
-              showPopover(ann.el, ann);
-              return;
-            }
-          } else {
-            settled = 0;
+        scrollAnnotationIntoView(ann, function () {
+          var liveTarget = getTargetFromAnnotation(ann);
+          if (!liveTarget) {
+            if (ann.orphaned) showOrphanPopover(ann);
+            return;
           }
-          lastY = curY;
-          requestAnimationFrame(waitForScroll);
-        }
-        requestAnimationFrame(waitForScroll);
+          showTargetHighlight(liveTarget);
+          showPopover(liveTarget, ann);
+        });
       }
     });
   }
@@ -849,15 +1307,14 @@
       ann.pinEl.style.left = '8px';
       return;
     }
-    if (!ann.el || !ann.el.isConnected) { ann.pinEl.style.display = 'none'; return; }
-    var r = ann.el.getBoundingClientRect();
-    var inView = r.bottom > 0 && r.top < window.innerHeight &&
-                 r.right > 0 && r.left < window.innerWidth;
+    var target = getTargetFromAnnotation(ann);
+    var anchor = getTargetAnchorRect(target);
+    var inView = anchor && anchor.bottom > 0 && anchor.top < window.innerHeight &&
+                 anchor.right > 0 && anchor.left < window.innerWidth;
     ann.pinEl.style.display = inView ? 'flex' : 'none';
     if (inView) {
-      // Clamp pin to stay fully visible within viewport
-      var top = Math.max(2, Math.min(r.top - 11, window.innerHeight - 28));
-      var left = Math.max(2, Math.min(r.right - 11, window.innerWidth - 28));
+      var top = Math.max(4, Math.min(anchor.top - 12, window.innerHeight - 32));
+      var left = Math.max(4, Math.min(anchor.right - 12, window.innerWidth - 32));
       ann.pinEl.style.top = top + 'px';
       ann.pinEl.style.left = left + 'px';
     }
@@ -867,7 +1324,7 @@
     annotations.forEach(positionPin);
     if (popover && popoverTarget) {
       positionPop(popoverTarget, popover);
-      showOverlay(popoverTarget);
+      showTargetHighlight(popoverTarget);
     } else if (commenting && lastMouseX >= 0) {
       var el = document.elementFromPoint(lastMouseX, lastMouseY);
       if (el && !isSkippable(el) && !isOurUI(el)) {
@@ -875,6 +1332,7 @@
         showOverlay(el);
       } else {
         hideOverlay();
+        hideTargetHighlight();
       }
     }
   }
@@ -883,7 +1341,20 @@
   function saveUndoState() {
     undoData = {
       items: annotations.map(function (a) {
-        return { id: a.id, el: a.el, selector: a.selector, type: a.type, comment: a.comment, orphaned: !!a.orphaned };
+        return {
+          id: a.id,
+          key: a.key,
+          kind: a.kind,
+          el: a.el,
+          range: a.range ? a.range.cloneRange() : null,
+          selector: a.selector,
+          type: a.type,
+          quote: a.quote,
+          textStart: a.textStart,
+          textEnd: a.textEnd,
+          comment: a.comment,
+          orphaned: !!a.orphaned,
+        };
       }),
       nextId: nextId,
     };
@@ -913,12 +1384,16 @@
     var savedNextId = undoData.nextId;
     clearUndoState();
     items.forEach(function (item) {
-      if (!item.el || !item.el.isConnected) {
+      var hasElementTarget = item.el && item.el.isConnected;
+
+      if (!hasElementTarget) {
         // Restore orphaned annotations too
         if (item.selector) {
           var orphan = {
-            id: item.id, el: null, selector: item.selector,
-            type: item.type, comment: item.comment, pinEl: null,
+            id: item.id, key: item.key, kind: item.kind, el: null,
+            range: null, selector: item.selector,
+            type: item.type, quote: item.quote, textStart: item.textStart, textEnd: item.textEnd,
+            comment: item.comment, pinEl: null,
             orphaned: true,
           };
           annotations.push(orphan);
@@ -927,8 +1402,18 @@
         return;
       }
       var ann = {
-        id: item.id, el: item.el, selector: item.selector,
-        type: item.type, comment: item.comment, pinEl: null,
+        id: item.id,
+        key: item.key,
+        kind: item.kind,
+        el: item.el,
+        range: item.range || null,
+        selector: item.selector,
+        type: item.type,
+        quote: item.quote,
+        textStart: item.textStart,
+        textEnd: item.textEnd,
+        comment: item.comment,
+        pinEl: null,
       };
       annotations.push(ann);
       createPin(ann);
@@ -1141,31 +1626,47 @@
     return parts.length ? parts.join(' > ') : '';
   }
 
+  function getExportLabel(ann) {
+    return ann.kind === 'text' ? 'text selection' : (ann.type || 'element');
+  }
+
+  function quoteExportValue(value) {
+    var clean = normalizeQuote(value);
+    if (!clean) return '';
+    return '"' + clean.replace(/"/g, '\\"') + '"';
+  }
+
   /* ── copy ──────────────────────────────────────────────── */
-  function formatMarkdown() {
-    var lines = [
-      'Design Review - ' + document.title,
-      'URL: ' + location.href,
-      'Viewport: ' + window.innerWidth + '\u00d7' + window.innerHeight, '',
-    ];
-    annotations.forEach(function (ann) {
-      lines.push(ann.id + '. [' + ann.type + '] ' + ann.selector);
+  function formatMarkdown(items) {
+    var source = items || annotations;
+    var lines = ['URL: ' + location.href];
+    var title = normalizeQuote(document.title || '');
+    if (title) lines.push('Title: ' + title);
+    lines.push('');
+
+    source.forEach(function (ann) {
+      lines.push(ann.id + '. [' + getExportLabel(ann) + '] ' + ann.selector);
+
+      var html = ann.el ? getCleanTag(ann.el) : '';
+      var text = ann.kind === 'text' ? ann.quote : (ann.el ? getTextPreview(ann.el) : '');
+      var context = ann.el ? getAncestorTrail(ann.el) : '';
+      var comment = normalizeQuote(ann.comment);
+
+      if (html) lines.push('   HTML: ' + html);
+      if (text) lines.push('   ' + (ann.kind === 'text' ? 'Quote' : 'Text') + ': ' + quoteExportValue(text));
+      if (context) lines.push('   Context: ' + context);
+
       if (ann.orphaned) {
-        lines.push('   (Element not found)');
-        lines.push('   Comment: ' + ann.comment);
+        lines.push('   Status: Element not found');
+        lines.push('   Comment: ' + comment);
         lines.push('');
         return;
       }
-      var trail = getAncestorTrail(ann.el);
-      if (trail) lines.push('   In: ' + trail);
-      var tag = getCleanTag(ann.el);
-      if (tag) lines.push('   HTML: ' + tag);
-      var text = getTextPreview(ann.el);
-      if (text) lines.push('   Text: "' + text + '"');
-      lines.push('   Comment: ' + ann.comment);
+
+      lines.push('   Comment: ' + comment);
       lines.push('');
     });
-    return lines.join('\n');
+    return lines.join('\n').trim();
   }
 
   function copyAll() {
@@ -1189,6 +1690,7 @@
       flashBtn(btnSend, ico.send);
       showToast(count + ' annotation' + (count !== 1 ? 's' : '') + ' copied & cleared');
       hidePopover();
+      hideTargetHighlight();
       hideOverlay();
       annotations.forEach(function (a) { if (a.pinEl) a.pinEl.remove(); });
       annotations = [];
@@ -1238,83 +1740,208 @@
 
   /* ── persistence ───────────────────────────────────────── */
   var LRU_MAX_KEYS = 50;
+  var RESTORE_RETRY_DELAY = 350;
+  var RESTORE_RETRY_MAX = 12;
+  var restoreRequestId = 0;
+  var restoreTimer = null;
 
-  function persist() {
-    var data = {
+  function buildPersistData() {
+    return {
       nextId: nextId,
       _lastAccess: Date.now(),
       items: annotations.map(function (a) {
-        return { id: a.id, selector: a.selector, type: a.type, comment: a.comment };
+        return {
+          id: a.id,
+          key: a.key,
+          kind: a.kind,
+          selector: a.selector,
+          type: a.type,
+          quote: a.quote || '',
+          textStart: a.textStart,
+          textEnd: a.textEnd,
+          comment: a.comment,
+        };
       }),
     };
-    try {
-      localStorage.setItem(STORE_KEY, JSON.stringify(data));
-      pruneOldEntries();
-    } catch (e) { /* full */ }
+  }
+
+  function normalizeStoredData(raw) {
+    if (!raw) return null;
+    if (typeof raw === 'string') {
+      try { return JSON.parse(raw); } catch (e) { return null; }
+    }
+    return raw;
+  }
+
+  function clearRestoreTimer() {
+    clearTimeout(restoreTimer);
+    restoreTimer = null;
+  }
+
+  function scheduleRestore(attempt) {
+    clearRestoreTimer();
+    restoreTimer = setTimeout(function () {
+      restore(attempt);
+    }, RESTORE_RETRY_DELAY);
+  }
+
+  function loadStoredData(done) {
+    chrome.storage.local.get([STORE_KEY], function (result) {
+      var data = normalizeStoredData(result[STORE_KEY]);
+      if (data) {
+        done(data);
+        return;
+      }
+
+      var legacyRaw = null;
+      try { legacyRaw = localStorage.getItem(STORE_KEY); } catch (e) { legacyRaw = null; }
+      var legacyData = normalizeStoredData(legacyRaw);
+      if (legacyData) {
+        var migratePayload = {};
+        migratePayload[STORE_KEY] = legacyData;
+        chrome.storage.local.set(migratePayload);
+      }
+      done(legacyData);
+    });
+  }
+
+  function persist() {
+    var data = buildPersistData();
+    var payload = {};
+    payload[STORE_KEY] = data;
+    chrome.storage.local.set(payload);
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch (e) { /* blocked */ }
+    pruneOldEntries();
   }
 
   function pruneOldEntries() {
-    var keys = [];
-    try {
-      for (var i = 0; i < localStorage.length; i++) {
-        var k = localStorage.key(i);
-        if (k && k.indexOf('pinpoint:') === 0) keys.push(k);
-      }
-    } catch (e) { return; }
-    if (keys.length <= LRU_MAX_KEYS) return;
-    var entries = [];
-    keys.forEach(function (k) {
-      try {
-        var raw = localStorage.getItem(k);
-        var parsed = raw ? JSON.parse(raw) : null;
+    chrome.storage.local.get(null, function (all) {
+      var entries = [];
+      Object.keys(all || {}).forEach(function (key) {
+        if (key.indexOf('pinpoint:') !== 0) return;
+        var parsed = normalizeStoredData(all[key]);
         var ts = parsed && parsed._lastAccess ? parsed._lastAccess : 0;
-        entries.push({ key: k, ts: ts });
-      } catch (e) { entries.push({ key: k, ts: 0 }); }
-    });
-    entries.sort(function (a, b) { return a.ts - b.ts; });
-    var toRemove = entries.length - LRU_MAX_KEYS;
-    for (var j = 0; j < toRemove; j++) {
-      if (entries[j].key !== STORE_KEY) {
-        try { localStorage.removeItem(entries[j].key); } catch (e) { /* */ }
+        entries.push({ key: key, ts: ts });
+      });
+      if (entries.length <= LRU_MAX_KEYS) return;
+      entries.sort(function (a, b) { return a.ts - b.ts; });
+      var removeKeys = [];
+      var toRemove = entries.length - LRU_MAX_KEYS;
+      for (var i = 0; i < toRemove; i++) {
+        if (entries[i].key !== STORE_KEY) removeKeys.push(entries[i].key);
       }
-    }
+      if (removeKeys.length) chrome.storage.local.remove(removeKeys);
+    });
   }
 
-  function restore() {
-    var orphanCount = 0;
-    try {
-      var raw = localStorage.getItem(STORE_KEY);
-      if (!raw) return;
-      var data = JSON.parse(raw);
-      nextId = data.nextId || 1;
-      (data.items || []).forEach(function (item) {
-        var el;
+  function restore(attempt) {
+    attempt = attempt || 0;
+    clearRestoreTimer();
+    var requestId = ++restoreRequestId;
+
+    loadStoredData(function (data) {
+      if (requestId !== restoreRequestId) return;
+      if (!data) {
+        if (annotations.length === 0) updateCount();
+        return;
+      }
+
+      var orphanCount = 0;
+      var droppedLegacyGroups = 0;
+      var pendingItems = [];
+      var restoredItems = [];
+      var items = data.items || [];
+
+      for (var i = 0; i < items.length; i++) {
+        var item = items[i];
+        if (item.kind === 'group') {
+          droppedLegacyGroups++;
+          continue;
+        }
+
+        var el = null;
         try { el = document.querySelector(item.selector); } catch (e) { el = null; }
         if (!el) {
-          var orphan = {
-            id: item.id, el: null, selector: item.selector,
-            type: item.type, comment: item.comment, pinEl: null,
-            orphaned: true,
-          };
-          annotations.push(orphan);
-          createPin(orphan);
-          orphanCount++;
-          return;
+          pendingItems.push(item);
+          continue;
         }
+
         var ann = {
-          id: item.id, el: el, selector: item.selector,
-          type: item.type, comment: item.comment, pinEl: null,
+          id: item.id,
+          key: item.key,
+          kind: item.kind || 'element',
+          el: el,
+          range: null,
+          selector: item.selector,
+          type: item.type,
+          quote: item.quote,
+          textStart: item.textStart,
+          textEnd: item.textEnd,
+          comment: item.comment,
+          pinEl: null,
         };
+        if (ann.kind === 'text') {
+          ann.range = restoreRangeFromOffsets(el, item.textStart, item.textEnd, item.quote);
+          if (!ann.range) {
+            pendingItems.push(item);
+            continue;
+          }
+        }
+        ann.key = ann.key || getTargetKey({
+          kind: ann.kind || 'element',
+          selector: ann.selector,
+          textStart: ann.textStart,
+          textEnd: ann.textEnd,
+        });
+        restoredItems.push(ann);
+      }
+
+      if (pendingItems.length > 0 && attempt < RESTORE_RETRY_MAX) {
+        scheduleRestore(attempt + 1);
+        return;
+      }
+
+      nextId = data.nextId || 1;
+      restoredItems.forEach(function (ann) {
         annotations.push(ann);
         createPin(ann);
       });
-    } catch (e) { /* corrupt */ }
-    updateCount();
-    if (orphanCount > 0) {
-      setTimeout(function () {
-        showToast(orphanCount + ' annotation' + (orphanCount !== 1 ? 's' : '') + ' couldn\'t find their elements');
-      }, 400);
-    }
+
+      pendingItems.forEach(function (item) {
+        var orphan = {
+          id: item.id,
+          key: item.key || getTargetKey({
+            kind: item.kind || 'element',
+            selector: item.selector,
+            textStart: item.textStart,
+            textEnd: item.textEnd,
+          }),
+          kind: item.kind || 'element',
+          el: null,
+          range: null,
+          selector: item.selector,
+          type: item.type,
+          quote: item.quote,
+          textStart: item.textStart,
+          textEnd: item.textEnd,
+          comment: item.comment,
+          pinEl: null,
+          orphaned: true,
+        };
+        annotations.push(orphan);
+        createPin(orphan);
+        orphanCount++;
+      });
+
+      if (annotations.length === 0) nextId = 1;
+      updateCount();
+      if (droppedLegacyGroups > 0) persist();
+      if (orphanCount > 0) {
+        setTimeout(function () {
+          showToast(orphanCount + ' annotation' + (orphanCount !== 1 ? 's' : '') + ' couldn\'t find their elements');
+        }, 400);
+      }
+    });
   }
 
   /* ── selector builder (#12 — filter generated classes) ─── */
@@ -1332,7 +1959,12 @@
   }
 
   function buildSelector(el) {
-    if (el.id && !/\s/.test(el.id)) return '#' + cssEsc(el.id);
+    if (el.id && !/\s/.test(el.id)) {
+      var idSel = '#' + cssEsc(el.id);
+      try {
+        if (document.querySelectorAll(idSel).length === 1) return idSel;
+      } catch (e) { /* */ }
+    }
 
     if (el.className && typeof el.className === 'string') {
       var cls = el.className.trim().split(/\s+/).filter(function (c) {
@@ -1347,7 +1979,15 @@
     var path = [], cur = el;
     while (cur && cur !== document.body && cur !== document.documentElement) {
       var seg = cur.tagName.toLowerCase();
-      if (cur.id && !/\s/.test(cur.id)) { path.unshift('#' + cssEsc(cur.id)); break; }
+      if (cur.id && !/\s/.test(cur.id)) {
+        var curIdSel = '#' + cssEsc(cur.id);
+        try {
+          if (document.querySelectorAll(curIdSel).length === 1) {
+            path.unshift(curIdSel);
+            break;
+          }
+        } catch (e) { /* */ }
+      }
       var parent = cur.parentElement;
       if (parent) {
         var sibs = Array.from(parent.children).filter(function (s) { return s.tagName === cur.tagName; });
@@ -1392,8 +2032,8 @@
     var rgb = parseRgb(getEffectiveBgColor(ann.el));
     var lum = srgbLuminance(rgb.r, rgb.g, rgb.b);
 
-    // Distance to our accent orange (#d4620e = 212,98,14)
-    var dr = rgb.r - 212, dg = rgb.g - 98, db = rgb.b - 14;
+    // Distance to the Agimut accent orange (#e85102 = 232,81,2)
+    var dr = rgb.r - 232, dg = rgb.g - 81, db = rgb.b - 2;
     var orangeDist = Math.sqrt(dr * dr + dg * dg + db * db);
 
     ann.pinEl.classList.remove('pp-pin-light', 'pp-pin-alt');
@@ -1426,19 +2066,50 @@
   // Mousemove — hover highlight
   var lastMouseX = -1, lastMouseY = -1;
 
+  document.addEventListener('mousedown', function (e) {
+    if (!active || !commenting || popover || e.button !== 0) return;
+    if (isOurUI(e.target)) return;
+    selectionPointerDown = true;
+  }, true);
+
   document.addEventListener('mousemove', function (e) {
     lastMouseX = e.clientX;
     lastMouseY = e.clientY;
     if (!active || !commenting || popover) return;
+    if (selectionPointerDown && getTextSelectionTarget()) {
+      hideOverlay();
+      hideTargetHighlight();
+      return;
+    }
     if (isOurUI(e.target)) { hideOverlay(); return; }
     var el = document.elementFromPoint(e.clientX, e.clientY);
     if (isSkippable(el)) { hideOverlay(); return; }
     if (el !== hovered) { hovered = el; showOverlay(el); }
   }, true);
 
+  document.addEventListener('mouseup', function (e) {
+    if (!active || !commenting || e.button !== 0) return;
+    if (!selectionPointerDown) return;
+    selectionPointerDown = false;
+
+    var textTarget = prepareTarget(getTextSelectionTarget());
+    if (textTarget) {
+      suppressClickOnce = true;
+      showTargetHighlight(textTarget);
+      showPopover(textTarget);
+      clearBrowserSelection();
+    }
+  }, true);
+
   // Click — annotate or close popover (#1: works in ANY mode now)
   document.addEventListener('click', function (e) {
     if (!active) return;
+    if (suppressClickOnce) {
+      suppressClickOnce = false;
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     if (!menuPanel.classList.contains('pp-hidden') &&
         !menuPanel.contains(e.target) &&
         !btnShortcuts.contains(e.target)) {
@@ -1449,6 +2120,7 @@
     // Close popover on any outside click, regardless of comment mode (#1)
     if (popover) {
       hidePopover();
+      hideTargetHighlight();
       hideOverlay();
       if (commenting) { e.preventDefault(); e.stopPropagation(); }
       return;
@@ -1457,7 +2129,11 @@
     if (commenting) {
       e.preventDefault();
       e.stopPropagation();
-      if (hovered && !isSkippable(hovered)) showPopover(hovered);
+      if (hovered && !isSkippable(hovered)) {
+        var target = prepareTarget(makeElementTarget(hovered));
+        showTargetHighlight(target);
+        showPopover(target);
+      }
     }
   }, true);
 
@@ -1489,7 +2165,7 @@
     if (!active) return;
 
     if (popover || inputFocused()) {
-      if (e.key === 'Escape' && popover) { hidePopover(); hideOverlay(); }
+      if (e.key === 'Escape' && popover) { hidePopover(); hideTargetHighlight(); hideOverlay(); }
       return;
     }
 
@@ -1497,7 +2173,11 @@
 
     if (e.key === 'Escape') {
       if (!menuPanel.classList.contains('pp-hidden')) { hideMenu(); return; }
-      if (commenting) stopCommenting();
+      if (commenting) {
+        stopCommenting();
+        hideTargetHighlight();
+        selectionPointerDown = false;
+      }
       return;
     }
 
@@ -1545,7 +2225,9 @@
       // Enter — annotate hovered element
       if (e.key === 'Enter' && hovered && !isSkippable(hovered)) {
         e.preventDefault();
-        showPopover(hovered);
+        var hoverTarget = prepareTarget(makeElementTarget(hovered));
+        showTargetHighlight(hoverTarget);
+        showPopover(hoverTarget);
         resetTaps();
         return;
       }
@@ -1622,22 +2304,36 @@
   var currentPath = location.pathname;
   var currentSearch = location.search;
   var currentHash = location.hash;
+  var currentStoreKey = STORE_KEY;
 
   function onNavChange() {
     var newPath = location.pathname;
     var newSearch = location.search;
     var newHash = location.hash;
+    var newStoreKey = getStoreKey();
     if (newPath === currentPath && newSearch === currentSearch && newHash === currentHash) return;
+    if (newStoreKey === currentStoreKey) {
+      currentPath = newPath;
+      currentSearch = newSearch;
+      currentHash = newHash;
+      scheduleRefresh();
+      return;
+    }
     currentPath = newPath;
     currentSearch = newSearch;
     currentHash = newHash;
-    STORE_KEY = 'pinpoint:' + location.origin + location.pathname + location.search + location.hash;
+    currentStoreKey = newStoreKey;
+    STORE_KEY = newStoreKey;
+    clearRestoreTimer();
     annotations.forEach(function (a) { if (a.pinEl) a.pinEl.remove(); });
     annotations = [];
     nextId = 1;
     hidePopover();
+    hideTargetHighlight();
     hideOverlay();
     clearUndoState();
+    clearBrowserSelection();
+    selectionPointerDown = false;
     restore();
   }
 
@@ -1647,6 +2343,11 @@
   history.replaceState = function () { _replaceState.apply(this, arguments); onNavChange(); };
   window.addEventListener('popstate', onNavChange);
   window.addEventListener('hashchange', onNavChange);
+  window.addEventListener('pageshow', onNavChange);
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) onNavChange();
+  });
+  setInterval(onNavChange, 500);
 
   /* ── toolbar wiring ────────────────────────────────────── */
   btnComment.addEventListener('click', function (e) { e.stopPropagation(); commenting ? stopCommenting() : startCommenting(); });
@@ -1703,9 +2404,14 @@
   menuPanel.addEventListener('click', function (e) { e.stopPropagation(); });
 
   // Restore settings
-  chrome.storage.local.get('keyNavEnabled', function (data) {
+  chrome.storage.local.get(['keyNavEnabled', 'theme', 'toolbarPosition'], function (data) {
     keyNavEnabled = data.keyNavEnabled !== undefined ? !!data.keyNavEnabled : true;
     keyNavToggle.checked = keyNavEnabled;
+    applyTheme(data.theme);
+    applyToolbarPosition(data.toolbarPosition);
+    if (data.toolbarPosition !== toolbarPosition) {
+      chrome.storage.local.set({ toolbarPosition: toolbarPosition });
+    }
   });
 
   /* ── custom tooltips ──────────────────────────────────── */
@@ -1728,8 +2434,26 @@
     var br = btn.getBoundingClientRect();
     var tw = barTip.offsetWidth;
     var th = barTip.offsetHeight;
-    barTip.style.left = Math.max(8, br.left + br.width / 2 - tw / 2) + 'px';
-    barTip.style.top = (br.top - th - 10) + 'px';
+    var left = br.left + br.width / 2 - tw / 2;
+    var preferBelow = toolbarPosition.indexOf('top-') === 0;
+    var top;
+
+    left = Math.max(8, Math.min(left, window.innerWidth - tw - 8));
+
+    if (preferBelow) {
+      top = br.bottom + 10;
+      if (top + th > window.innerHeight - 8) {
+        top = Math.max(8, br.top - th - 10);
+      }
+    } else {
+      top = br.top - th - 10;
+      if (top < 8) {
+        top = Math.min(window.innerHeight - th - 8, br.bottom + 10);
+      }
+    }
+
+    barTip.style.left = left + 'px';
+    barTip.style.top = top + 'px';
   }
 
   function hideBarTip() {
@@ -1757,6 +2481,14 @@
   // NOTE: This function is duplicated in popup.js (which takes a host parameter).
   // Popup and content script run in separate JS contexts and cannot share code
   // without a build step. Keep both in sync manually.
+  function isLocalHtmlFile() {
+    return location.protocol === 'file:' && /\.html?(?:$|[?#])/i.test(location.pathname);
+  }
+
+  function getSiteKey() {
+    return isLocalHtmlFile() ? 'file://local-html' : location.hostname;
+  }
+
   function isDevHost() {
     var h = location.hostname;
     return h === 'localhost' || h === '127.0.0.1' || h === '0.0.0.0' ||
@@ -1764,10 +2496,20 @@
   }
 
   /* ── site disable/enable ────────────────────────────────── */
-  chrome.storage.local.get(['disabledHosts', 'devOnly'], function (data) {
+  chrome.storage.local.get(['disabledHosts', 'devOnly', 'theme', 'toolbarPosition'], function (data) {
     var list = data.disabledHosts || [];
     var devOnly = !!data.devOnly;
-    if (list.indexOf(location.hostname) !== -1 || (devOnly && !isDevHost())) {
+    var localHtml = isLocalHtmlFile();
+    var siteKey = getSiteKey();
+    applyTheme(data.theme);
+    applyToolbarPosition(data.toolbarPosition);
+    if (location.protocol === 'file:' && !localHtml) {
+      toggle.classList.add('pp-hidden');
+      return;
+    }
+    if (list.indexOf(siteKey) !== -1 ||
+        (localHtml && !devOnly) ||
+        (!localHtml && devOnly && !isDevHost())) {
       toggle.classList.add('pp-hidden');
     }
   });
@@ -1782,21 +2524,29 @@
       }
     }
     if (msg.type === 'agimut-devonly') {
-      if (msg.devOnly && !isDevHost()) {
+      var localHtml = isLocalHtmlFile();
+      if ((localHtml && !msg.devOnly) || (!localHtml && msg.devOnly && !isDevHost())) {
         if (active) deactivate();
         toggle.classList.add('pp-hidden');
       } else {
         chrome.storage.local.get('disabledHosts', function (data) {
           var list = data.disabledHosts || [];
-          if (list.indexOf(location.hostname) === -1) {
+          if (list.indexOf(getSiteKey()) === -1) {
             toggle.classList.remove('pp-hidden');
           }
         });
       }
     }
+    if (msg.type === 'agimut-settings') {
+      if (msg.theme) applyTheme(msg.theme);
+      if (msg.toolbarPosition) applyToolbarPosition(msg.toolbarPosition);
+      refreshAll();
+    }
   });
 
   /* ── init ──────────────────────────────────────────────── */
   pinLayer.classList.add('pp-hidden');
+  applyTheme(uiTheme);
+  applyToolbarPosition(toolbarPosition);
   restore();
 })();

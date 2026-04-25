@@ -44,18 +44,17 @@ The popup lets you:
 
 ```
 URL: https://example.com/page
-Title: Example Page
 
-1. [list item] nav.main-nav > ul > li:nth-of-type(3)
+1.
    HTML: <li class="flex items-center gap-6 px-4 py-2 text-sm">
    Text: "Products"
    Context: nav
-   Comment: Spacing between nav items is inconsistent, should be 16px
+   Feedback: Spacing between nav items is inconsistent, should be 16px
 
-2. [text selection] main > section > p:nth-of-type(2)
+2.
    Quote: "Start free for 14 days"
    Context: main > section
-   Comment: This line should be more prominent
+   Feedback: This line should be more prominent
 ```
 
 If a saved target no longer exists, Agimut keeps the comment as an orphan and exports it with `Status: Element not found`.
@@ -95,12 +94,13 @@ Keyboard navigation is enabled by default. Toggle it in the in-page menu (click 
 
 This lets you select a card container vs. the text inside it, which matters for precise design review.
 
-## Current version (v1.3)
+## Current version (v1.4)
 
 - text selection annotations
 - per-page persistence with route-aware restore
 - orphan handling when saved targets disappear
 - floating annotation navigator
+- orange comment badges with white text
 - site-level popup controls for enable/disable, dev-only mode, theme, and toolbar position
 
 ## License

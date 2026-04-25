@@ -10,11 +10,16 @@
   --pp-text-soft: #7d766e;
   --pp-border: rgba(255, 255, 255, 0.1);
   --pp-border-strong: rgba(255, 255, 255, 0.16);
+  --pp-badge-bg: var(--pp-accent);
+  --pp-badge-text: #fff;
+  --pp-badge-border: var(--pp-accent);
   --pp-shadow: 0 18px 42px rgba(0, 0, 0, 0.24);
   --pp-shadow-soft: 0 10px 26px rgba(0, 0, 0, 0.16);
   --pp-radius-outer: 18px;
   --pp-radius-inner: 12px;
   --pp-shell-pad: 6px;
+  --pp-popover-pad: 12px;
+  --pp-control-radius: calc(var(--pp-radius-inner) - var(--pp-shell-pad));
   --pp-button-size: 38px;
   --pp-toolbar-size: calc(var(--pp-button-size) + (var(--pp-shell-pad) * 2) + 2px);
   --pp-blur: blur(18px);
@@ -39,6 +44,9 @@
   --pp-text-soft: #91867b;
   --pp-border: rgba(24, 22, 20, 0.1);
   --pp-border-strong: rgba(24, 22, 20, 0.16);
+  --pp-badge-bg: var(--pp-accent);
+  --pp-badge-text: #fff;
+  --pp-badge-border: var(--pp-accent);
   --pp-shadow: 0 16px 34px rgba(79, 57, 33, 0.12);
   --pp-shadow-soft: 0 10px 24px rgba(79, 57, 33, 0.1);
 }
@@ -74,7 +82,8 @@ html.pp-commenting body * {
   cursor: default !important;
 }
 
-#pinpoint-root .pp-pop-input {
+#pinpoint-root .pp-pop-input,
+#pinpoint-root .pp-pop-editor {
   cursor: text !important;
 }
 
@@ -97,6 +106,14 @@ html.pp-commenting body * {
 
 #pinpoint-root .pp-overlay.pp-on {
   opacity: 1;
+}
+
+#pinpoint-root .pp-overlay.pp-ref-on {
+  border-color: rgba(255, 255, 255, 0.44);
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.18),
+    0 0 0 1px rgba(24, 22, 20, 0.16);
 }
 
 #pinpoint-root .pp-highlight-layer,
@@ -249,6 +266,9 @@ html.pp-commenting body * {
 
 #pinpoint-root .pp-bar-btn:hover,
 #pinpoint-root .pp-nav-btn:hover,
+#pinpoint-root .pp-pop-copy:hover,
+#pinpoint-root .pp-pop-ref:hover,
+#pinpoint-root .pp-ref-picker:hover,
 #pinpoint-root .pp-pop-delete:hover {
   background: var(--pp-bg-soft);
   color: var(--pp-text);
@@ -264,26 +284,33 @@ html.pp-commenting body * {
 #pinpoint-root .pp-bar-btn.pp-active-btn,
 #pinpoint-root .pp-pop-submit.pp-submit-on {
   background: var(--pp-accent);
-  color: #fff;
+  color: #fff !important;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
 #pinpoint-root .pp-bar-btn.pp-active-btn,
 #pinpoint-root .pp-pop-submit.pp-submit-on,
-#pinpoint-root .pp-comment-badge,
 #pinpoint-root .pp-toggle-badge,
 #pinpoint-root .pp-pin {
-  color: #fff;
+  color: #fff !important;
 }
 
 #pinpoint-root .pp-bar-btn.pp-active-btn svg,
+#pinpoint-root .pp-bar-btn.pp-active-btn svg *,
 #pinpoint-root .pp-pop-submit.pp-submit-on svg,
-#pinpoint-root .pp-comment-badge svg,
+#pinpoint-root .pp-pop-submit.pp-submit-on svg *,
 #pinpoint-root .pp-toggle-badge svg,
+#pinpoint-root .pp-toggle-badge svg *,
 #pinpoint-root .pp-pin svg {
-  color: #fff;
-  fill: currentColor;
-  stroke: currentColor;
+  color: #fff !important;
+  fill: currentColor !important;
+  stroke: currentColor !important;
+}
+
+#pinpoint-root .pp-pin svg * {
+  color: #fff !important;
+  fill: currentColor !important;
+  stroke: currentColor !important;
 }
 
 #pinpoint-root .pp-bar-btn.pp-btn-delete:hover {
@@ -387,10 +414,10 @@ html.pp-commenting body * {
 
 #pinpoint-root .pp-popover {
   position: fixed;
-  width: 332px;
+  width: 374px;
   max-width: calc(100vw - 16px);
-  padding: 12px;
-  border-radius: var(--pp-radius-outer);
+  padding: var(--pp-popover-pad);
+  border-radius: calc(var(--pp-radius-inner) + var(--pp-popover-pad));
   z-index: 2147483646;
   pointer-events: auto;
   display: flex;
@@ -425,7 +452,9 @@ html.pp-commenting body * {
 
 #pinpoint-root .pp-pop-quote.pp-pop-quote-single {
   align-items: center;
-  min-height: 78px;
+  min-height: 0;
+  padding-top: 6px;
+  padding-bottom: 6px;
 }
 
 #pinpoint-root[data-theme="light"] .pp-pop-quote {
@@ -470,9 +499,23 @@ html.pp-commenting body * {
   padding-top: 0;
 }
 
-#pinpoint-root .pp-comment-card {
+#pinpoint-root .pp-comment-card,
+#pinpoint-root .pp-new-comment-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  align-items: start;
   padding: 8px 0 10px;
   border-bottom: 1px solid var(--pp-border);
+}
+
+#pinpoint-root .pp-new-comment-row {
+  padding: 0;
+  border-bottom: 0;
+}
+
+#pinpoint-root .pp-popover > .pp-comment-card:first-child {
+  padding-top: 0;
 }
 
 #pinpoint-root .pp-comment-header {
@@ -485,7 +528,7 @@ html.pp-commenting body * {
 #pinpoint-root .pp-comment-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 #pinpoint-root .pp-comment-badge {
@@ -496,8 +539,9 @@ html.pp-commenting body * {
   height: 22px;
   padding: 0 6px;
   border-radius: 8px;
-  background: var(--pp-accent);
-  color: #fff;
+  border: 1px solid var(--pp-badge-border);
+  background: var(--pp-badge-bg);
+  color: var(--pp-badge-text);
   font-size: 10px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -526,10 +570,47 @@ html.pp-commenting body * {
 }
 
 #pinpoint-root .pp-comment-card .pp-pop-copy,
+#pinpoint-root .pp-comment-card .pp-pop-ref,
+#pinpoint-root .pp-comment-card .pp-pop-save,
 #pinpoint-root .pp-comment-card .pp-pop-delete {
   width: 32px;
   height: 32px;
   flex-shrink: 0;
+}
+
+#pinpoint-root .pp-comment-shell {
+  padding: 0;
+  overflow: hidden;
+  min-width: 0;
+}
+
+#pinpoint-root .pp-comment-badge-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 0;
+}
+
+#pinpoint-root .pp-comment-editor-row {
+  padding: 8px;
+}
+
+#pinpoint-root .pp-new-comment-editor-row {
+  padding: 8px;
+}
+
+#pinpoint-root .pp-comment-control-row {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px;
+  border-top: 1px solid var(--pp-border);
+}
+
+#pinpoint-root .pp-comment-shell:focus-within .pp-comment-control-row,
+#pinpoint-root .pp-comment-shell.pp-comment-dirty .pp-comment-control-row {
+  display: flex;
 }
 
 #pinpoint-root .pp-new-comment {
@@ -551,9 +632,25 @@ html.pp-commenting body * {
   resize: vertical;
   outline: none;
   font-size: 15px;
-  line-height: 1.5;
+  line-height: 1.68;
   color: var(--pp-text);
   padding: 6px 8px;
+}
+
+#pinpoint-root .pp-pop-editor {
+  width: 100%;
+  min-height: 70px;
+  max-height: 220px;
+  overflow-y: auto;
+  outline: none;
+  font-size: 15px;
+  line-height: 1.68;
+  color: var(--pp-text);
+  padding: 6px 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  text-wrap: pretty;
+  -webkit-font-smoothing: antialiased;
 }
 
 #pinpoint-root .pp-comment-card .pp-pop-input {
@@ -561,14 +658,28 @@ html.pp-commenting body * {
   font-size: 14px;
 }
 
+#pinpoint-root .pp-comment-card .pp-pop-editor {
+  min-height: 54px;
+  font-size: 14px;
+  padding: 4px 4px 6px 0;
+}
+
 #pinpoint-root .pp-pop-input::placeholder {
   color: var(--pp-text-soft);
 }
 
+#pinpoint-root .pp-pop-editor:empty::before {
+  content: attr(data-placeholder);
+  color: var(--pp-text-soft);
+  pointer-events: none;
+}
+
 #pinpoint-root .pp-pop-btns {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 6px;
+  padding: 6px;
+  border-top: 1px solid var(--pp-border);
 }
 
 #pinpoint-root .pp-pop-btn {
@@ -577,6 +688,12 @@ html.pp-commenting body * {
   justify-content: center;
   width: 36px;
   height: 36px;
+  border-radius: var(--pp-control-radius);
+}
+
+#pinpoint-root .pp-input-shell-new .pp-pop-btn {
+  width: 32px;
+  height: 32px;
 }
 
 #pinpoint-root .pp-pop-submit {
@@ -585,6 +702,55 @@ html.pp-commenting body * {
 
 #pinpoint-root .pp-pop-submit:not(.pp-submit-on) {
   color: var(--pp-text-soft);
+}
+
+#pinpoint-root .pp-ref-picker.pp-ref-active {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--pp-text);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+
+#pinpoint-root .pp-ref-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-height: 24px;
+  margin: 3px 2px;
+  padding: 2px 9px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.11);
+  color: rgba(255, 255, 255, 0.88);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.2;
+  vertical-align: baseline;
+  cursor: default;
+  transition-property: background, color, padding, box-shadow;
+  transition-duration: 160ms;
+}
+
+#pinpoint-root[data-theme="light"] .pp-ref-chip {
+  background: rgba(24, 22, 20, 0.07);
+  color: rgba(24, 22, 20, 0.78);
+  box-shadow:
+    inset 0 0 0 1px rgba(24, 22, 20, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+#pinpoint-root .pp-ref-chip:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+#pinpoint-root .pp-ref-chip-label {
+  display: inline-block;
+  max-width: 188px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 #pinpoint-root .pp-bar-btn:focus-visible,

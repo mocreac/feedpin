@@ -13,6 +13,8 @@
   var morphTimer = null;
   var uiTheme = 'dark';
   var toolbarPosition = 'bottom-left';
+  var referencePicking = false;
+  var referenceEditor = null;
 
   /* ── transient selection state ─────────────────────────── */
   var highlightNodes = [];
@@ -42,6 +44,57 @@
   }
 
   var STORE_KEY = getStoreKey();
+
+  function safeStorageGet(keys, done) {
+    try {
+      if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) {
+        if (done) done({});
+        return;
+      }
+      chrome.storage.local.get(keys, function (result) {
+        try {
+          if (chrome.runtime && chrome.runtime.lastError) {
+            if (done) done({});
+            return;
+          }
+          if (done) done(result || {});
+        } catch (e) {
+          if (done) done({});
+        }
+      });
+    } catch (e) {
+      if (done) done({});
+    }
+  }
+
+  function safeStorageSet(payload) {
+    try {
+      if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return;
+      chrome.storage.local.set(payload, function () {
+        try {
+          if (chrome.runtime && chrome.runtime.lastError) return;
+        } catch (e) { /* extension context can be invalidated on reload */ }
+      });
+    } catch (e) { /* extension context can be invalidated on reload */ }
+  }
+
+  function safeStorageRemove(keys) {
+    try {
+      if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return;
+      chrome.storage.local.remove(keys, function () {
+        try {
+          if (chrome.runtime && chrome.runtime.lastError) return;
+        } catch (e) { /* extension context can be invalidated on reload */ }
+      });
+    } catch (e) { /* extension context can be invalidated on reload */ }
+  }
+
+  function safeRuntimeOnMessage(handler) {
+    try {
+      if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.onMessage) return;
+      chrome.runtime.onMessage.addListener(handler);
+    } catch (e) { /* extension context can be invalidated on reload */ }
+  }
 
   /* ── friendly tag names ────────────────────────────────── */
   var TAG = {
@@ -74,6 +127,7 @@
     check:       'M229.66,77.66l-128,128a8,8,0,0,1-11.32,0l-56-56a8,8,0,0,1,11.32-11.32L96,188.69,218.34,66.34a8,8,0,0,1,11.32,11.32Z',
     undo:        'M224,128a96,96,0,0,1-94.71,96H128A95.38,95.38,0,0,1,62.1,197.8a8,8,0,0,1,11-11.63A80,80,0,1,0,71.43,71.39a3.07,3.07,0,0,1-.26.25L44.59,96H72a8,8,0,0,1,0,16H24a8,8,0,0,1-8-8V56a8,8,0,0,1,16,0V85.8L60.25,60A96,96,0,0,1,224,128Z',
     sliders:     'M64,105V40a8,8,0,0,0-16,0v65a32,32,0,0,0,0,62v49a8,8,0,0,0,16,0V167a32,32,0,0,0,0-62Zm-8,47a16,16,0,1,1,16-16A16,16,0,0,1,56,152Zm80-95V40a8,8,0,0,0-16,0V57a32,32,0,0,0,0,62v97a8,8,0,0,0,16,0V119a32,32,0,0,0,0-62Zm-8,47a16,16,0,1,1,16-16A16,16,0,0,1,128,104Zm104,64a32.06,32.06,0,0,0-24-31V40a8,8,0,0,0-16,0v97a32,32,0,0,0,0,62v17a8,8,0,0,0,16,0V199A32.06,32.06,0,0,0,232,168Zm-32,16a16,16,0,1,1,16-16A16,16,0,0,1,200,184Z',
+    crosshair:   'M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm8,191.63V184a8,8,0,0,0-16,0v31.63A88.13,88.13,0,0,1,40.37,136H72a8,8,0,0,0,0-16H40.37A88.13,88.13,0,0,1,120,40.37V72a8,8,0,0,0,16,0V40.37A88.13,88.13,0,0,1,215.63,120H184a8,8,0,0,0,0,16h31.63A88.13,88.13,0,0,1,136,215.63Z',
   };
 
   var ico = {
@@ -88,6 +142,7 @@
     check:    ph(P.check),
     undo:     ph(P.undo),
     sliders:  ph(P.sliders),
+    crosshair: ph(P.crosshair),
   };
 
   var logoSvg = '<svg width="22" height="17" viewBox="83 68 378 289" fill="none" stroke="currentColor" stroke-width="40" stroke-linecap="round" stroke-linejoin="round"><path d="M113.279 198.073L225.785 327.192V98.2M225.785 327.192L331.751 122.192H430.911"/></svg>';
@@ -430,7 +485,7 @@
   }
 
   /* ── hover overlay ─────────────────────────────────────── */
-  function showOverlay(el) {
+  function showOverlay(el, mode) {
     var r = el.getBoundingClientRect();
     var vw = window.innerWidth;
     var vh = window.innerHeight;
@@ -447,12 +502,13 @@
     overlay.style.left = visLeft + 'px';
     overlay.style.width = visW + 'px';
     overlay.style.height = visH + 'px';
+    overlay.classList.toggle('pp-ref-on', mode === 'reference');
     overlay.classList.add('pp-on');
 
     var name = typeName(el);
     var text = (el.textContent || '').trim();
     var preview = text.length > 35 ? text.slice(0, 35) + '\u2026' : text;
-    tip.textContent = name + (preview ? ': ' + preview : '');
+    tip.textContent = (mode === 'reference' ? 'Reference ' : '') + name + (preview ? ': ' + preview : '');
 
     // Clamp tooltip to viewport (#8)
     var tipLeft = visLeft;
@@ -467,6 +523,7 @@
 
   function hideOverlay() {
     overlay.classList.remove('pp-on');
+    overlay.classList.remove('pp-ref-on');
     tip.classList.remove('pp-on');
     hovered = null;
   }
@@ -797,16 +854,260 @@
   }
 
   /* ── popover ───────────────────────────────────────────── */
+  function makeReferenceId() {
+    return 'ref-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
+  }
+
+  function makeReferenceFromElement(el) {
+    var label = typeName(el);
+    var text = getTextPreview(el);
+    return {
+      id: makeReferenceId(),
+      selector: buildSelector(el),
+      type: label,
+      label: label + (text ? ': ' + text : ''),
+      html: getCleanTag(el),
+      text: text,
+      context: getAncestorTrail(el),
+    };
+  }
+
+  function resolveReference(ref) {
+    if (!ref || !ref.selector) return null;
+    var el = null;
+    try { el = document.querySelector(ref.selector); } catch (e) { el = null; }
+    if (!el || isSkippable(el)) return null;
+    ref.type = typeName(el);
+    ref.label = ref.type + (getTextPreview(el) ? ': ' + getTextPreview(el) : '');
+    ref.html = getCleanTag(el);
+    ref.text = getTextPreview(el);
+    ref.context = getAncestorTrail(el);
+    return el;
+  }
+
+  function sanitizeReferences(refs) {
+    if (!Array.isArray(refs) || !refs.length) return [];
+    var kept = [];
+    refs.forEach(function (ref) {
+      if (resolveReference(ref)) kept.push(ref);
+    });
+    return kept;
+  }
+
+  function pruneMissingReferences() {
+    var dirty = false;
+    annotations.forEach(function (ann) {
+      if (!ann.references || !ann.references.length) return;
+      var nextRefs = sanitizeReferences(ann.references);
+      if (nextRefs.length === ann.references.length) return;
+      var ids = nextRefs.map(function (ref) { return ref.id; });
+      ann.references = nextRefs;
+      if (ann.parts) {
+        ann.parts = ann.parts.filter(function (part) {
+          return part.type !== 'ref' || ids.indexOf(part.id) !== -1;
+        });
+      }
+      dirty = true;
+    });
+    if (dirty) persist();
+  }
+
+  function stopReferencePicking() {
+    var wasPicking = referencePicking || referenceEditor;
+    referencePicking = false;
+    if (referenceEditor && referenceEditor.button) referenceEditor.button.classList.remove('pp-ref-active');
+    referenceEditor = null;
+    if (wasPicking) hideOverlay();
+  }
+
+  function getEditorRange(editor) {
+    if (editor._savedRange &&
+        editor.contains(editor._savedRange.startContainer) &&
+        editor.contains(editor._savedRange.endContainer)) {
+      return editor._savedRange.cloneRange();
+    }
+    var sel = window.getSelection();
+    if (sel && sel.rangeCount) {
+      var range = sel.getRangeAt(0);
+      if (editor.contains(range.startContainer) && editor.contains(range.endContainer)) return range;
+    }
+    var end = document.createRange();
+    end.selectNodeContents(editor);
+    end.collapse(false);
+    return end;
+  }
+
+  function saveEditorRange(editor) {
+    var sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return;
+    var range = sel.getRangeAt(0);
+    if (editor.contains(range.startContainer) && editor.contains(range.endContainer)) {
+      editor._savedRange = range.cloneRange();
+    }
+  }
+
+  function placeCaretAfter(node) {
+    var range = document.createRange();
+    var sel = window.getSelection();
+    range.setStartAfter(node);
+    range.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
+  function createReferenceChip(ref, onRemove) {
+    var chip = document.createElement('span');
+    chip.className = 'pp-ref-chip';
+    chip.contentEditable = 'false';
+    chip.setAttribute('role', 'button');
+    chip.setAttribute('tabindex', '0');
+    chip.dataset.refId = ref.id;
+    chip.title = ref.selector;
+
+    var label = document.createElement('span');
+    label.className = 'pp-ref-chip-label';
+    label.textContent = ref.type || ref.label || 'element';
+    chip.appendChild(label);
+
+    function removeChip(e) {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      var prev = chip.previousSibling;
+      var next = chip.nextSibling;
+      chip.remove();
+      if (prev && prev.nodeType === Node.TEXT_NODE && next && next.nodeType === Node.TEXT_NODE) {
+        prev.nodeValue += next.nodeValue;
+        next.remove();
+      }
+      if (onRemove) onRemove();
+    }
+
+    chip.addEventListener('mouseenter', function () {
+      var el = resolveReference(ref);
+      if (el) showOverlay(el, 'reference');
+    });
+    chip.addEventListener('mouseleave', hideOverlay);
+    chip.addEventListener('keydown', function (e) {
+      if (e.key === 'Backspace' || e.key === 'Delete') removeChip(e);
+    });
+
+    return chip;
+  }
+
+  function insertReferenceChip(editor, ref) {
+    editor.focus();
+    editor._refs = editor._refs || [];
+    editor._refs.push(ref);
+    var chip = createReferenceChip(ref, function () {
+      editor.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    var range = getEditorRange(editor);
+    range.deleteContents();
+    var after = document.createTextNode(' ');
+    range.insertNode(after);
+    range.insertNode(chip);
+    placeCaretAfter(after);
+    editor._savedRange = null;
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  function serializeEditor(editor) {
+    var refs = [];
+    var parts = [];
+    var comment = '';
+
+    function pushText(text) {
+      if (!text) return;
+      parts.push({ type: 'text', text: text });
+      comment += text;
+    }
+
+    function walk(node) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        pushText(node.nodeValue);
+        return;
+      }
+      if (node.nodeType !== Node.ELEMENT_NODE) return;
+      if (node.classList && node.classList.contains('pp-ref-chip')) {
+        var id = node.dataset.refId;
+        var ref = (editor._refs || []).find(function (item) { return item.id === id; });
+        if (ref && resolveReference(ref)) {
+          refs.push(ref);
+          parts.push({ type: 'ref', id: ref.id });
+          comment += '[Referenced ' + (ref.type || 'element') + ']';
+        }
+        return;
+      }
+      if (node.tagName === 'BR') {
+        pushText('\n');
+        return;
+      }
+      Array.from(node.childNodes).forEach(walk);
+      if (node.tagName === 'DIV' || node.tagName === 'P') pushText('\n');
+    }
+
+    Array.from(editor.childNodes).forEach(walk);
+    return {
+      comment: normalizeQuote(comment),
+      refs: refs,
+      parts: parts,
+    };
+  }
+
+  function renderEditor(editor, comment, refs, parts, onChange) {
+    editor.innerHTML = '';
+    editor._refs = sanitizeReferences((refs || []).slice());
+
+    function appendText(text) {
+      editor.appendChild(document.createTextNode(text));
+    }
+
+    if (parts && parts.length) {
+      parts.forEach(function (part) {
+        if (part.type === 'ref') {
+          var ref = editor._refs.find(function (item) { return item.id === part.id; });
+          if (ref) editor.appendChild(createReferenceChip(ref, onChange));
+        } else {
+          appendText(part.text || '');
+        }
+      });
+    } else if (comment) {
+      appendText(comment);
+    }
+  }
+
+  function createCommentEditor(options) {
+    var editor = document.createElement('div');
+    editor.className = 'pp-pop-editor';
+    editor.contentEditable = 'true';
+    editor.setAttribute('role', 'textbox');
+    editor.setAttribute('aria-multiline', 'true');
+    editor.setAttribute('aria-label', options.label);
+    editor.dataset.placeholder = options.placeholder;
+    renderEditor(editor, options.comment || '', options.references || [], options.parts || [], options.onChange);
+    return editor;
+  }
+
   function buildCommentCard(ann) {
+    ann.references = sanitizeReferences(ann.references || []);
     var card = document.createElement('div');
     card.className = 'pp-comment-card';
 
-    var header = document.createElement('div');
-    header.className = 'pp-comment-header';
+    var shell = document.createElement('div');
+    shell.className = 'pp-input-shell pp-comment-shell';
+
+    var badgeWrap = document.createElement('div');
+    badgeWrap.className = 'pp-comment-badge-wrap';
+    var editorRow = document.createElement('div');
+    editorRow.className = 'pp-comment-editor-row';
+
     var badge = document.createElement('span');
     badge.className = 'pp-comment-badge';
     badge.textContent = ann.id;
-    header.appendChild(badge);
+    badgeWrap.appendChild(badge);
+    card.appendChild(badgeWrap);
 
     var actions = document.createElement('div');
     actions.className = 'pp-comment-actions';
@@ -828,6 +1129,18 @@
     });
     actions.appendChild(copy);
 
+    var save = document.createElement('button');
+    save.className = 'pp-pop-btn pp-pop-save pp-pop-submit';
+    save.title = 'Save';
+    save.setAttribute('aria-label', 'Save');
+    save.innerHTML = ico.check;
+    save.disabled = true;
+    save.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      commitAnnotationEdit();
+    });
+
     var del = document.createElement('button');
     del.className = 'pp-pop-btn pp-pop-delete';
     del.title = 'Delete';
@@ -835,45 +1148,133 @@
     del.innerHTML = ico.trashSm;
     del.addEventListener('click', function (e) {
       e.stopPropagation();
+      deleteAnnotationAndContinue();
+    });
+    actions.appendChild(del);
+
+    var input = createCommentEditor({
+      label: 'Annotation ' + ann.id,
+      placeholder: 'Describe what should change',
+      comment: ann.comment,
+      references: ann.references,
+      parts: ann.parts,
+      onChange: updateSaveState,
+    });
+    editorRow.appendChild(input);
+    shell.appendChild(editorRow);
+
+    var controlRow = document.createElement('div');
+    controlRow.className = 'pp-comment-control-row';
+    controlRow.appendChild(actions);
+    controlRow.appendChild(save);
+    shell.appendChild(controlRow);
+    card.appendChild(shell);
+
+    var savedSnapshot = snapshotEditorData(getCurrentEditorData());
+
+    function snapshotEditorData(data) {
+      return JSON.stringify({
+        comment: data.comment || '',
+        refs: (data.refs || []).map(function (ref) {
+          return {
+            id: ref.id,
+            selector: ref.selector,
+            type: ref.type,
+            text: ref.text || '',
+            context: ref.context || '',
+          };
+        }),
+        parts: data.parts || [],
+      });
+    }
+
+    function getCurrentEditorData() {
+      return serializeEditor(input);
+    }
+
+    function setSaveDirty(isDirty) {
+      save.classList.toggle('pp-submit-on', isDirty);
+      shell.classList.toggle('pp-comment-dirty', isDirty);
+      save.disabled = !isDirty;
+    }
+
+    function updateSaveState() {
+      setSaveDirty(snapshotEditorData(getCurrentEditorData()) !== savedSnapshot);
+    }
+
+    function commitAnnotationEdit() {
+      var data = getCurrentEditorData();
+      if (!data.comment && data.refs.length === 0) {
+        deleteAnnotationAndContinue();
+        return;
+      }
+      ann.comment = data.comment;
+      ann.references = data.refs;
+      ann.parts = data.parts;
+      persist();
+      savedSnapshot = snapshotEditorData(data);
+      setSaveDirty(false);
+      flashBtn(save, ico.check);
+      showToast('Annotation ' + ann.id + ' saved');
+    }
+
+    function deleteAnnotationAndContinue() {
+      var target = popoverTarget || getTargetFromAnnotation(ann);
       deleteAnnotation(ann.id);
       var remaining = annotations.filter(function (item) { return item.key === ann.key; });
       if (remaining.length > 0) {
         navPillTo(remaining[0]);
-      } else {
-        hidePopover();
-        hideTargetHighlight();
-        hideOverlay();
+        return;
       }
-    });
-    actions.appendChild(del);
-    header.appendChild(actions);
-    card.appendChild(header);
-
-    var shell = document.createElement('div');
-    shell.className = 'pp-input-shell';
-
-    var input = document.createElement('textarea');
-    input.className = 'pp-pop-input';
-    input.value = ann.comment;
-    input.rows = 1;
-    input.setAttribute('aria-label', 'Annotation ' + ann.id);
-    shell.appendChild(input);
-    card.appendChild(shell);
-
-    function autoGrow() {
-      input.style.height = 'auto';
-      input.style.height = input.scrollHeight + 'px';
+      if (target) {
+        showTargetHighlight(target);
+        showPopover(target);
+        return;
+      }
+      hidePopover();
+      hideTargetHighlight();
+      hideOverlay();
     }
+
     input.addEventListener('input', function () {
-      autoGrow();
-      ann.comment = input.value;
-      persist();
+      updateSaveState();
+      saveEditorRange(input);
     });
+    input.addEventListener('keyup', function () { saveEditorRange(input); });
+    input.addEventListener('mouseup', function () { saveEditorRange(input); });
+    input.addEventListener('click', function () { saveEditorRange(input); });
     input.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); hidePopover(); hideTargetHighlight(); hideOverlay(); }
+      saveEditorRange(input);
       e.stopPropagation();
     });
-    requestAnimationFrame(autoGrow);
+
+    var ref = document.createElement('button');
+    ref.className = 'pp-pop-btn pp-pop-ref pp-ref-picker';
+    ref.title = 'Reference element';
+    ref.setAttribute('aria-label', 'Reference element');
+    ref.innerHTML = ico.crosshair;
+    ref.addEventListener('mousedown', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      saveEditorRange(input);
+    });
+    ref.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      referencePicking = !referencePicking;
+      if (referencePicking) {
+        saveEditorRange(input);
+        referenceEditor = { editor: input, button: ref };
+        ref.classList.add('pp-ref-active');
+        input.focus();
+        hideTargetHighlight();
+        hideOverlay();
+      } else {
+        stopReferencePicking();
+      }
+    });
+    actions.insertBefore(ref, actions.firstChild);
 
     return card;
   }
@@ -925,25 +1326,60 @@
       newSection.appendChild(quote);
     }
 
+    var newRow = document.createElement('div');
+    newRow.className = 'pp-new-comment-row';
+
+    var newBadgeWrap = document.createElement('div');
+    newBadgeWrap.className = 'pp-comment-badge-wrap pp-new-comment-badge-wrap';
+    var newBadge = document.createElement('span');
+    newBadge.className = 'pp-comment-badge';
+    newBadge.textContent = nextId;
+    newBadgeWrap.appendChild(newBadge);
+    newRow.appendChild(newBadgeWrap);
+
     var shell = document.createElement('div');
-    shell.className = 'pp-input-shell pp-input-shell-new';
+    shell.className = 'pp-input-shell pp-comment-shell pp-input-shell-new';
 
-    var input = document.createElement('textarea');
-    input.className = 'pp-pop-input';
-    input.placeholder = isEdit ? 'Add another note' : 'Describe what should change';
-    input.setAttribute('aria-label', 'New comment');
-    input.rows = 1;
-    shell.appendChild(input);
-    newSection.appendChild(shell);
+    var editorRow = document.createElement('div');
+    editorRow.className = 'pp-comment-editor-row pp-new-comment-editor-row';
 
-    function autoGrow() {
-      input.style.height = 'auto';
-      input.style.height = input.scrollHeight + 'px';
-    }
-    input.addEventListener('input', autoGrow);
+    var input = createCommentEditor({
+      label: 'New comment',
+      placeholder: isEdit ? 'Add another note' : 'Describe what should change',
+      onChange: sync,
+    });
+    editorRow.appendChild(input);
+    shell.appendChild(editorRow);
 
     var btnRow = document.createElement('div');
     btnRow.className = 'pp-pop-btns';
+
+    var refBtn = document.createElement('button');
+    refBtn.className = 'pp-pop-btn pp-ref-picker';
+    refBtn.title = 'Reference element';
+    refBtn.setAttribute('aria-label', 'Reference element');
+    refBtn.innerHTML = ico.crosshair;
+    refBtn.addEventListener('mousedown', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      saveEditorRange(input);
+    });
+    refBtn.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      referencePicking = !referencePicking;
+      if (referencePicking) {
+        saveEditorRange(input);
+        referenceEditor = { editor: input, button: refBtn };
+        refBtn.classList.add('pp-ref-active');
+        input.focus();
+        hideTargetHighlight();
+        hideOverlay();
+      } else {
+        stopReferencePicking();
+      }
+    });
+    btnRow.appendChild(refBtn);
 
     var submit = document.createElement('button');
     submit.className = 'pp-pop-btn pp-pop-submit';
@@ -953,31 +1389,41 @@
     submit.disabled = true;
 
     function sync() {
-      var on = input.value.trim().length > 0;
+      var data = serializeEditor(input);
+      var on = data.comment.trim().length > 0 || data.refs.length > 0;
       submit.classList.toggle('pp-submit-on', on);
       submit.disabled = !on;
     }
-    input.addEventListener('input', sync);
+    input.addEventListener('input', function () {
+      sync();
+      saveEditorRange(input);
+    });
+    input.addEventListener('keyup', function () { saveEditorRange(input); });
+    input.addEventListener('mouseup', function () { saveEditorRange(input); });
+    input.addEventListener('click', function () { saveEditorRange(input); });
 
     submit.addEventListener('click', function (e) {
       e.stopPropagation();
       commit();
     });
     btnRow.appendChild(submit);
-    newSection.appendChild(btnRow);
+    shell.appendChild(btnRow);
+    newRow.appendChild(shell);
+    newSection.appendChild(newRow);
 
     input.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commit(); }
       if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); hidePopover(); hideTargetHighlight(); hideOverlay(); }
+      saveEditorRange(input);
       e.stopPropagation();
     });
 
     pop.appendChild(newSection);
 
     function commit() {
-      var text = input.value.trim();
-      if (!text) return;
-      addAnnotation(target, text);
+      var data = serializeEditor(input);
+      if (!data.comment && data.refs.length === 0) return;
+      addAnnotation(target, data.comment, data.refs, data.parts);
       hidePopover();
       hideTargetHighlight();
       hideOverlay();
@@ -998,6 +1444,7 @@
   }
 
   function hidePopover() {
+    stopReferencePicking();
     if (popover) {
       popover.remove();
       popover = null;
@@ -1153,7 +1600,7 @@
   }
 
   /* ── annotations & pins ────────────────────────────────── */
-  function addAnnotation(target, comment) {
+  function addAnnotation(target, comment, references, parts) {
     target = prepareTarget(target);
     var ann = {
       id: nextId++,
@@ -1167,6 +1614,8 @@
       textStart: target.kind === 'text' ? target.textStart : null,
       textEnd: target.kind === 'text' ? target.textEnd : null,
       comment: comment,
+      references: sanitizeReferences(references || []),
+      parts: parts || null,
       pinEl: null,
     };
     annotations.push(ann);
@@ -1321,6 +1770,7 @@
   }
 
   function refreshAll() {
+    pruneMissingReferences();
     annotations.forEach(positionPin);
     if (popover && popoverTarget) {
       positionPop(popoverTarget, popover);
@@ -1353,6 +1803,8 @@
           textStart: a.textStart,
           textEnd: a.textEnd,
           comment: a.comment,
+          references: (a.references || []).slice(),
+          parts: a.parts ? a.parts.slice() : null,
           orphaned: !!a.orphaned,
         };
       }),
@@ -1394,6 +1846,7 @@
             range: null, selector: item.selector,
             type: item.type, quote: item.quote, textStart: item.textStart, textEnd: item.textEnd,
             comment: item.comment, pinEl: null,
+            references: sanitizeReferences(item.references || []), parts: item.parts || null,
             orphaned: true,
           };
           annotations.push(orphan);
@@ -1413,6 +1866,8 @@
         textStart: item.textStart,
         textEnd: item.textEnd,
         comment: item.comment,
+        references: sanitizeReferences(item.references || []),
+        parts: item.parts || null,
         pinEl: null,
       };
       annotations.push(ann);
@@ -1636,21 +2091,63 @@
     return '"' + clean.replace(/"/g, '\\"') + '"';
   }
 
+  function getReferenceSummary(ref) {
+    var text = normalizeQuote(ref && ref.text);
+    var type = ref && ref.type ? ref.type : 'element';
+    if (!text) return type;
+    return type + ' ' + quoteExportValue(text.length > 44 ? text.slice(0, 44) + '\u2026' : text);
+  }
+
+  function getInlineFeedback(ann) {
+    var parts = Array.isArray(ann.parts) ? ann.parts : [];
+    if (!parts.length) return normalizeQuote(ann.comment);
+    var refs = sanitizeReferences(ann.references);
+    var refIndex = {};
+    refs.forEach(function (ref, index) {
+      refIndex[ref.id] = index + 1;
+    });
+    var text = '';
+    parts.forEach(function (part) {
+      if (part.type === 'ref') {
+        var ref = refs.find(function (item) { return item.id === part.id; });
+        if (ref) text += '<ref:' + refIndex[ref.id] + '>';
+      } else {
+        text += part.text || '';
+      }
+    });
+    return normalizeQuote(text || ann.comment);
+  }
+
+  function appendReferenceExport(lines, ann) {
+    var refs = sanitizeReferences(Array.isArray(ann.references) ? ann.references : []);
+    ann.references = refs;
+    if (!refs.length) return;
+    lines.push('   Inline references:');
+    lines.push('      The <ref:n> tokens appear inside Feedback at the exact sentence position where the user inserted each reference. Use the surrounding words to infer intent, such as matching, comparing, or borrowing style/content from that referenced element.');
+    refs.forEach(function (ref, index) {
+      if (!ref) return;
+      lines.push('      <ref:' + (index + 1) + '> ' + getReferenceSummary(ref));
+      lines.push('         Role: inline comparison/context target, not the primary annotated element');
+      if (ref.selector) lines.push('         Selector: ' + ref.selector);
+      if (ref.html) lines.push('         HTML snapshot: ' + ref.html);
+      if (ref.text) lines.push('         Visible text: ' + quoteExportValue(ref.text));
+      if (ref.context) lines.push('         Ancestor context: ' + ref.context);
+    });
+  }
+
   /* ── copy ──────────────────────────────────────────────── */
   function formatMarkdown(items) {
     var source = items || annotations;
     var lines = ['URL: ' + location.href];
-    var title = normalizeQuote(document.title || '');
-    if (title) lines.push('Title: ' + title);
     lines.push('');
 
     source.forEach(function (ann) {
-      lines.push(ann.id + '. [' + getExportLabel(ann) + '] ' + ann.selector);
+      lines.push(ann.id + '.');
 
       var html = ann.el ? getCleanTag(ann.el) : '';
       var text = ann.kind === 'text' ? ann.quote : (ann.el ? getTextPreview(ann.el) : '');
       var context = ann.el ? getAncestorTrail(ann.el) : '';
-      var comment = normalizeQuote(ann.comment);
+      var comment = getInlineFeedback(ann);
 
       if (html) lines.push('   HTML: ' + html);
       if (text) lines.push('   ' + (ann.kind === 'text' ? 'Quote' : 'Text') + ': ' + quoteExportValue(text));
@@ -1658,12 +2155,14 @@
 
       if (ann.orphaned) {
         lines.push('   Status: Element not found');
-        lines.push('   Comment: ' + comment);
+        lines.push('   Feedback: ' + comment);
+        appendReferenceExport(lines, ann);
         lines.push('');
         return;
       }
 
-      lines.push('   Comment: ' + comment);
+      lines.push('   Feedback: ' + comment);
+      appendReferenceExport(lines, ann);
       lines.push('');
     });
     return lines.join('\n').trim();
@@ -1760,6 +2259,8 @@
           textStart: a.textStart,
           textEnd: a.textEnd,
           comment: a.comment,
+          references: a.references || [],
+          parts: a.parts || null,
         };
       }),
     };
@@ -1786,7 +2287,7 @@
   }
 
   function loadStoredData(done) {
-    chrome.storage.local.get([STORE_KEY], function (result) {
+    safeStorageGet([STORE_KEY], function (result) {
       var data = normalizeStoredData(result[STORE_KEY]);
       if (data) {
         done(data);
@@ -1799,7 +2300,7 @@
       if (legacyData) {
         var migratePayload = {};
         migratePayload[STORE_KEY] = legacyData;
-        chrome.storage.local.set(migratePayload);
+        safeStorageSet(migratePayload);
       }
       done(legacyData);
     });
@@ -1809,13 +2310,13 @@
     var data = buildPersistData();
     var payload = {};
     payload[STORE_KEY] = data;
-    chrome.storage.local.set(payload);
+    safeStorageSet(payload);
     try { localStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch (e) { /* blocked */ }
     pruneOldEntries();
   }
 
   function pruneOldEntries() {
-    chrome.storage.local.get(null, function (all) {
+    safeStorageGet(null, function (all) {
       var entries = [];
       Object.keys(all || {}).forEach(function (key) {
         if (key.indexOf('pinpoint:') !== 0) return;
@@ -1830,7 +2331,7 @@
       for (var i = 0; i < toRemove; i++) {
         if (entries[i].key !== STORE_KEY) removeKeys.push(entries[i].key);
       }
-      if (removeKeys.length) chrome.storage.local.remove(removeKeys);
+      if (removeKeys.length) safeStorageRemove(removeKeys);
     });
   }
 
@@ -1878,6 +2379,8 @@
           textStart: item.textStart,
           textEnd: item.textEnd,
           comment: item.comment,
+          references: sanitizeReferences(item.references || []),
+          parts: item.parts || null,
           pinEl: null,
         };
         if (ann.kind === 'text') {
@@ -1925,6 +2428,8 @@
           textStart: item.textStart,
           textEnd: item.textEnd,
           comment: item.comment,
+          references: sanitizeReferences(item.references || []),
+          parts: item.parts || null,
           pinEl: null,
           orphaned: true,
         };
@@ -2075,6 +2580,13 @@
   document.addEventListener('mousemove', function (e) {
     lastMouseX = e.clientX;
     lastMouseY = e.clientY;
+    if (referencePicking) {
+      if (isOurUI(e.target)) { hideOverlay(); return; }
+      var refEl = document.elementFromPoint(e.clientX, e.clientY);
+      if (isSkippable(refEl)) { hideOverlay(); return; }
+      if (refEl !== hovered) { hovered = refEl; showOverlay(refEl, 'reference'); }
+      return;
+    }
     if (!active || !commenting || popover) return;
     if (selectionPointerDown && getTextSelectionTarget()) {
       hideOverlay();
@@ -2117,6 +2629,17 @@
     }
     if (isOurUI(e.target)) return;
 
+    if (referencePicking && referenceEditor) {
+      e.preventDefault();
+      e.stopPropagation();
+      var refTarget = document.elementFromPoint(e.clientX, e.clientY);
+      if (!isSkippable(refTarget)) {
+        insertReferenceChip(referenceEditor.editor, makeReferenceFromElement(refTarget));
+        stopReferencePicking();
+      }
+      return;
+    }
+
     // Close popover on any outside click, regardless of comment mode (#1)
     if (popover) {
       hidePopover();
@@ -2147,6 +2670,7 @@
   // Nav pill arrow key navigation (capture phase — fires before textarea stopPropagation)
   document.addEventListener('keydown', function (e) {
     if (!active || !navPillActive || navCurrentId === null || annotations.length <= 1) return;
+    if (inputFocused()) return;
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
     e.preventDefault();
     e.stopPropagation();
@@ -2397,20 +2921,20 @@
 
   keyNavToggle.addEventListener('change', function () {
     keyNavEnabled = this.checked;
-    chrome.storage.local.set({ keyNavEnabled: keyNavEnabled });
+    safeStorageSet({ keyNavEnabled: keyNavEnabled });
   });
 
   // Stop clicks inside menu from propagating (prevents toolbar close)
   menuPanel.addEventListener('click', function (e) { e.stopPropagation(); });
 
   // Restore settings
-  chrome.storage.local.get(['keyNavEnabled', 'theme', 'toolbarPosition'], function (data) {
+  safeStorageGet(['keyNavEnabled', 'theme', 'toolbarPosition'], function (data) {
     keyNavEnabled = data.keyNavEnabled !== undefined ? !!data.keyNavEnabled : true;
     keyNavToggle.checked = keyNavEnabled;
     applyTheme(data.theme);
     applyToolbarPosition(data.toolbarPosition);
     if (data.toolbarPosition !== toolbarPosition) {
-      chrome.storage.local.set({ toolbarPosition: toolbarPosition });
+      safeStorageSet({ toolbarPosition: toolbarPosition });
     }
   });
 
@@ -2496,7 +3020,7 @@
   }
 
   /* ── site disable/enable ────────────────────────────────── */
-  chrome.storage.local.get(['disabledHosts', 'devOnly', 'theme', 'toolbarPosition'], function (data) {
+  safeStorageGet(['disabledHosts', 'devOnly', 'theme', 'toolbarPosition'], function (data) {
     var list = data.disabledHosts || [];
     var devOnly = !!data.devOnly;
     var localHtml = isLocalHtmlFile();
@@ -2514,7 +3038,7 @@
     }
   });
 
-  chrome.runtime.onMessage.addListener(function (msg) {
+  safeRuntimeOnMessage(function (msg) {
     if (msg.type === 'agimut-toggle') {
       if (msg.enabled) {
         toggle.classList.remove('pp-hidden');
@@ -2529,7 +3053,7 @@
         if (active) deactivate();
         toggle.classList.add('pp-hidden');
       } else {
-        chrome.storage.local.get('disabledHosts', function (data) {
+        safeStorageGet('disabledHosts', function (data) {
           var list = data.disabledHosts || [];
           if (list.indexOf(getSiteKey()) === -1) {
             toggle.classList.remove('pp-hidden');
